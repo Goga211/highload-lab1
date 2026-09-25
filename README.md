@@ -1,5 +1,7 @@
 # Каршеринг. Лабораторная работа 1
 
+[![CI](https://github.com/Goga211/highload-lab1/actions/workflows/ci.yml/badge.svg)](https://github.com/Goga211/highload-lab1/actions/workflows/ci.yml)
+
 Курс «Высокопроизводительные системы», ИТМО, группа P3432.
 Авторы: Долинный Михаил, Антипин Григорий.
 
@@ -42,6 +44,16 @@ docker compose up --build
    если его нет на машине.
 2. Поднять только базу: `docker compose up -d postgres`.
 3. Запустить конфигурацию `CarsharingApplication` (лежит в `.run/`, переменные окружения уже заданы).
+
+## CI/CD
+
+GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml)) на каждый push и pull request:
+
+1. `./gradlew check`: ktlint, модульные и интеграционные тесты с Testcontainers, порог покрытия 70%.
+   Итоги тестов и покрытия в сводке прогона, отчёты в артефактах.
+2. `docker compose up --build`: стек поднимается как на защите, проверяются health, OpenAPI и демо-данные.
+3. Сборка Docker-образа. Из `main` образ публикуется в GitHub Container Registry:
+   `ghcr.io/goga211/highload-lab1:latest` и тег по коммиту.
 
 ## Тесты
 
