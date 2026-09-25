@@ -89,7 +89,10 @@ class RentalService(
     fun start(id: UUID): RentalResponse {
         val rental = lock(id)
         if (rental.status != RentalStatus.RESERVED) {
-            conflict(ErrorCode.INVALID_STATUS_TRANSITION, "Стартовать можно только бронь, аренда в статусе ${rental.status}")
+            conflict(
+                ErrorCode.INVALID_STATUS_TRANSITION,
+                "Стартовать можно только бронь, аренда в статусе ${rental.status}",
+            )
         }
         val now = clock.instant()
         if (isOverdue(rental, now)) conflict(ErrorCode.RESERVATION_EXPIRED, "Бронь истекла, забронируйте машину заново")
@@ -108,7 +111,10 @@ class RentalService(
         val rental = lock(id)
         if (rental.status == RentalStatus.COMPLETED) return rental.toResponse()
         if (rental.status != RentalStatus.ACTIVE) {
-            conflict(ErrorCode.INVALID_STATUS_TRANSITION, "Завершить можно только активную аренду, статус ${rental.status}")
+            conflict(
+                ErrorCode.INVALID_STATUS_TRANSITION,
+                "Завершить можно только активную аренду, статус ${rental.status}",
+            )
         }
         val telemetry = fleet.readTelemetry(rental.vehicleId)
         val zone = fleet.findZoneAt(telemetry.latitude, telemetry.longitude)
@@ -179,10 +185,9 @@ class RentalService(
         return tariff
     }
 
-    private fun resolveOption(selection: OptionSelection) =
-        options.find(selection.optionId).also {
-            if (!it.active) unprocessable(ErrorCode.OPTION_UNAVAILABLE, "Опция ${it.code} недоступна")
-        } to selection.quantity
+    private fun resolveOption(selection: OptionSelection) = options.find(selection.optionId).also {
+        if (!it.active) unprocessable(ErrorCode.OPTION_UNAVAILABLE, "Опция ${it.code} недоступна")
+    } to selection.quantity
 
     private fun isOverdue(rental: Rental, now: java.time.Instant): Boolean =
         rental.reservedAt.plus(Duration.ofMinutes(properties.rental.reservationTtlMinutes)).isBefore(now)

@@ -37,10 +37,7 @@ data class DriverProfile(
  * в ЛР2 этот интерфейс станет Feign-клиентом user-service.
  */
 @Service
-class UserDirectory(
-    private val users: AppUserRepository,
-    private val licenses: DriverLicenseRepository,
-) {
+class UserDirectory(private val users: AppUserRepository, private val licenses: DriverLicenseRepository) {
 
     @Transactional(readOnly = true)
     fun getDriverProfile(userId: UUID): DriverProfile {
@@ -72,5 +69,6 @@ class UserDirectory(
         }
     }
 
-    private fun find(userId: UUID): AppUser = users.findByIdOrNull(userId) ?: throw NotFoundException("Пользователь", userId)
+    private fun find(userId: UUID): AppUser =
+        users.findByIdOrNull(userId) ?: throw NotFoundException("Пользователь", userId)
 }

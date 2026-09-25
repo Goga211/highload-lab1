@@ -36,7 +36,12 @@ class LicenseApiIT : IntegrationTest() {
     fun `new approved license replaces the previous one`() {
         val first = fixtures.addLicense(clientId).id()
         fixtures.approveLicense(first, supportId)
-        val second = fixtures.addLicense(clientId, issuedAt = LocalDate.of(2024, 2, 1), expiresAt = LocalDate.of(2034, 2, 1), firstIssuedAt = LocalDate.of(2019, 6, 1)).id()
+        val second = fixtures.addLicense(
+            clientId,
+            issuedAt = LocalDate.of(2024, 2, 1),
+            expiresAt = LocalDate.of(2034, 2, 1),
+            firstIssuedAt = LocalDate.of(2019, 6, 1),
+        ).id()
 
         fixtures.approveLicense(second, supportId)
 
@@ -73,7 +78,13 @@ class LicenseApiIT : IntegrationTest() {
         val id = fixtures.addLicense(clientId).id()
 
         val noReason = api.post("/api/v1/licenses/$id/reject", mapOf("verifierId" to supportId, "reason" to " "))
-        val rejected = api.post("/api/v1/licenses/$id/reject", mapOf("verifierId" to supportId, "reason" to "Фото нечитаемо"))
+        val rejected = api.post(
+            "/api/v1/licenses/$id/reject",
+            mapOf(
+                "verifierId" to supportId,
+                "reason" to "Фото нечитаемо",
+            ),
+        )
         val approveAfterReject = fixtures.approveLicense(id, supportId)
 
         assertThat(noReason.status).isEqualTo(400)
@@ -93,12 +104,18 @@ class LicenseApiIT : IntegrationTest() {
         )
 
         assertThat(response.status).isEqualTo(400)
-        assertThat(response.path<List<String>>("$.errors[*].field")).contains("expiresAt", "firstIssuedAt", "categories")
+        assertThat(
+            response.path<List<String>>("$.errors[*].field"),
+        ).contains("expiresAt", "firstIssuedAt", "categories")
     }
 
     @Test
     fun `expired license and bad number format are rejected`() {
-        val expired = fixtures.addLicense(clientId, issuedAt = LocalDate.of(2012, 1, 1), expiresAt = LocalDate.of(2022, 1, 1))
+        val expired = fixtures.addLicense(
+            clientId,
+            issuedAt = LocalDate.of(2012, 1, 1),
+            expiresAt = LocalDate.of(2022, 1, 1),
+        )
         val badNumber = fixtures.addLicense(clientId, number = "12-34")
 
         assertThat(expired.status).isEqualTo(400)

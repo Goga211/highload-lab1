@@ -41,7 +41,9 @@ interface RentalOptionRepository : JpaRepository<RentalOption, UUID> {
     fun existsByCode(code: String): Boolean
 }
 
-interface RentalRepository : JpaRepository<Rental, UUID>, JpaSpecificationExecutor<Rental> {
+interface RentalRepository :
+    JpaRepository<Rental, UUID>,
+    JpaSpecificationExecutor<Rental> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Rental r where r.id = :id")

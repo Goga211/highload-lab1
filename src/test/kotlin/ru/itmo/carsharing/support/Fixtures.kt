@@ -78,7 +78,12 @@ class Fixtures(private val api: Api) {
         support: UUID = createUser("SUPPORT", LocalDate.of(1990, 1, 1)),
     ): UUID {
         val clientId = createUser("CLIENT", birthDate)
-        val license = addLicense(clientId, issuedAt = maxOf(firstIssuedAt, LocalDate.of(2019, 6, 1)), firstIssuedAt = firstIssuedAt)
+        val license =
+            addLicense(
+                clientId,
+                issuedAt = maxOf(firstIssuedAt, LocalDate.of(2019, 6, 1)),
+                firstIssuedAt = firstIssuedAt,
+            )
         assertThat(license.status).describedAs(license.toString()).isEqualTo(201)
         val approved = approveLicense(license.id(), support)
         assertThat(approved.status).describedAs(approved.toString()).isEqualTo(200)
@@ -164,8 +169,8 @@ class Fixtures(private val api: Api) {
         lon: Double = Places.CITY_LON,
     ): Map<String, Any> {
         val n = next()
-        val plate = "${plateLetters[n % plateLetters.length]}%03d${plateLetters[(n / 12) % 12]}${plateLetters[(n / 144) % 12]}178"
-            .format(n % 1000)
+        val series = "${plateLetters[(n / 12) % 12]}${plateLetters[(n / 144) % 12]}"
+        val plate = "${plateLetters[n % plateLetters.length]}%03d${series}178".format(n % 1000)
         return mapOf(
             "vin" to "Z94K241BAMR%06d".format(n),
             "plateNumber" to plate,
@@ -177,11 +182,16 @@ class Fixtures(private val api: Api) {
         )
     }
 
-    fun telemetry(vehicleId: UUID, odometerKm: Int, fuel: Int = 70, lat: Double = Places.CITY_LAT, lon: Double = Places.CITY_LON): ApiResponse =
-        api.post(
-            "/api/v1/vehicles/$vehicleId/telemetry",
-            mapOf("latitude" to lat, "longitude" to lon, "odometerKm" to odometerKm, "fuelLevelPercent" to fuel),
-        )
+    fun telemetry(
+        vehicleId: UUID,
+        odometerKm: Int,
+        fuel: Int = 70,
+        lat: Double = Places.CITY_LAT,
+        lon: Double = Places.CITY_LON,
+    ): ApiResponse = api.post(
+        "/api/v1/vehicles/$vehicleId/telemetry",
+        mapOf("latitude" to lat, "longitude" to lon, "odometerKm" to odometerKm, "fuelLevelPercent" to fuel),
+    )
 
     /** Тариф "Базовый" из демо-данных: 8 за минуту, 3 за км, 2.5 за минуту ожидания, 20 минут, депозит 3000. */
     fun basicTariff(
@@ -217,14 +227,18 @@ class Fixtures(private val api: Api) {
         return response.id()
     }
 
-    fun book(userId: UUID, vehicleId: UUID, options: List<Map<String, Any>> = emptyList(), tariffId: UUID? = null): ApiResponse =
-        api.post(
-            "/api/v1/rentals",
-            buildMap {
-                put("userId", userId)
-                put("vehicleId", vehicleId)
-                put("options", options)
-                if (tariffId != null) put("tariffId", tariffId)
-            },
-        )
+    fun book(
+        userId: UUID,
+        vehicleId: UUID,
+        options: List<Map<String, Any>> = emptyList(),
+        tariffId: UUID? = null,
+    ): ApiResponse = api.post(
+        "/api/v1/rentals",
+        buildMap {
+            put("userId", userId)
+            put("vehicleId", vehicleId)
+            put("options", options)
+            if (tariffId != null) put("tariffId", tariffId)
+        },
+    )
 }

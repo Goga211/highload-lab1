@@ -48,7 +48,9 @@ class Api(private val mockMvc: MockMvc, private val json: JsonMapper) {
     private fun MockHttpServletRequestBuilder.withHeaders(headers: Map<String, String>): MockHttpServletRequestBuilder =
         apply { headers.forEach { (name, value) -> header(name, value) } }
 
-    private fun MockHttpServletRequestBuilder.withParams(params: Array<out Pair<String, Any?>>): MockHttpServletRequestBuilder =
+    private fun MockHttpServletRequestBuilder.withParams(
+        params: Array<out Pair<String, Any?>>,
+    ): MockHttpServletRequestBuilder =
         apply { params.forEach { (name, value) -> if (value != null) param(name, value.toString()) } }
 
     private fun perform(request: MockHttpServletRequestBuilder): ApiResponse {

@@ -18,10 +18,7 @@ import ru.itmo.carsharing.users.service.UserDirectory
 import java.util.UUID
 
 @Service
-class RentalQueryService(
-    private val rentals: RentalRepository,
-    private val users: UserDirectory,
-) {
+class RentalQueryService(private val rentals: RentalRepository, private val users: UserDirectory) {
 
     @Transactional(readOnly = true)
     fun get(id: UUID): RentalResponse =
@@ -30,7 +27,9 @@ class RentalQueryService(
     @Transactional(readOnly = true)
     fun list(status: RentalStatus?, userId: UUID?, page: Int, size: Int): PageResponse<RentalResponse> {
         val pageable = Paging.of(page, size, Sort.by("reservedAt").descending())
-        return PageResponse.from(rentals.findAll(filter(status, userId), pageable)) { it.toResponse(withOptions = false) }
+        return PageResponse.from(rentals.findAll(filter(status, userId), pageable)) {
+            it.toResponse(withOptions = false)
+        }
     }
 
     /**
@@ -44,12 +43,11 @@ class RentalQueryService(
         return SliceResponse.from(rentals.findAllByUserId(userId, pageable)) { it.toResponse(withOptions = false) }
     }
 
-    private fun filter(status: RentalStatus?, userId: UUID?): Specification<Rental> =
-        Specification { root, _, cb ->
-            val predicates = buildList<Predicate> {
-                status?.let { add(cb.equal(root.get<RentalStatus>("status"), it)) }
-                userId?.let { add(cb.equal(root.get<UUID>("userId"), it)) }
-            }
-            cb.and(*predicates.toTypedArray())
+    private fun filter(status: RentalStatus?, userId: UUID?): Specification<Rental> = Specification { root, _, cb ->
+        val predicates = buildList<Predicate> {
+            status?.let { add(cb.equal(root.get<RentalStatus>("status"), it)) }
+            userId?.let { add(cb.equal(root.get<UUID>("userId"), it)) }
         }
+        cb.and(*predicates.toTypedArray())
+    }
 }
