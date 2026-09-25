@@ -1,0 +1,14 @@
+carsharing:
+  scheduling:
+    enabled: false
+  rental:
+    reservation-ttl-minutes: 30
+
+spring:
+  liquibase:
+    contexts: default
+
+logging:
+  level:
+    root: WARN
+    ru.itmo.carsharing: INFO
