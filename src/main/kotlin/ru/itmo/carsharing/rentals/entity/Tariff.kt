@@ -75,11 +75,10 @@ class Tariff(
     var modelIds: MutableSet<UUID> = mutableSetOf()
         protected set
 
-    fun isApplicable(modelId: UUID, at: Instant): Boolean =
-        status == TariffStatus.ACTIVE &&
-            !validFrom.isAfter(at) &&
-            (validTo == null || validTo!!.isAfter(at)) &&
-            modelId in modelIds
+    fun isApplicable(modelId: UUID, at: Instant): Boolean = status == TariffStatus.ACTIVE &&
+        !validFrom.isAfter(at) &&
+        (validTo == null || validTo!!.isAfter(at)) &&
+        modelId in modelIds
 
     fun archive() {
         status = TariffStatus.ARCHIVED

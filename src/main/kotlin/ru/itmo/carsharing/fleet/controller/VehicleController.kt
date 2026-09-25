@@ -7,6 +7,7 @@ import jakarta.validation.constraints.DecimalMax
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -16,7 +17,9 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import ru.itmo.carsharing.common.web.ApiErrors
 import ru.itmo.carsharing.common.web.ApiPaths
 import ru.itmo.carsharing.common.web.Paging
 import ru.itmo.carsharing.common.web.SliceResponse
@@ -39,6 +42,8 @@ import java.util.UUID
 class VehicleController(private val vehicles: VehicleService) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiErrors(404, 409)
     @Operation(summary = "Добавить машину")
     fun create(@Valid @RequestBody request: CreateVehicleRequest): ResponseEntity<VehicleResponse> {
         val vehicle = vehicles.create(request)
@@ -69,19 +74,22 @@ class VehicleController(private val vehicles: VehicleService) {
     ): SliceResponse<NearbyVehicleResponse> = vehicles.nearby(lat, lon, radiusM, page, size)
 
     @PutMapping("/{id}")
-    @Operation(summary = "Изменить карточку: госномер и модель")
+    @ApiErrors(409)
+    @Operation(summary = "Изменить карточку: госномер и модель. Модель меняется только у свободной машины")
     fun update(@PathVariable id: UUID, @Valid @RequestBody request: UpdateVehicleRequest): VehicleResponse =
         vehicles.update(id, request)
 
     @PostMapping("/{id}/telemetry")
+    @ApiErrors(409, 422)
     @Operation(summary = "Бортовой блок присылает координаты, одометр и топливо")
     fun telemetry(@PathVariable id: UUID, @Valid @RequestBody request: TelemetryRequest): VehicleResponse =
         vehicles.recordTelemetry(id, request)
 
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ApiErrors(409)
     @Operation(summary = "Списать машину: статус DECOMMISSIONED, физически запись остаётся")
-    fun decommission(@PathVariable id: UUID): ResponseEntity<Void> {
+    fun decommission(@PathVariable id: UUID) {
         vehicles.decommission(id)
-        return ResponseEntity.noContent().build()
     }
 }

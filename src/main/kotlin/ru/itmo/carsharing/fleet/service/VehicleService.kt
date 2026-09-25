@@ -38,7 +38,12 @@ class VehicleService(
 
     @Transactional
     fun create(request: CreateVehicleRequest): VehicleResponse {
-        if (vehicles.existsByVin(request.vin)) conflict(ErrorCode.DUPLICATE_RESOURCE, "Машина с VIN ${request.vin} уже есть")
+        if (vehicles.existsByVin(
+                request.vin,
+            )
+        ) {
+            conflict(ErrorCode.DUPLICATE_RESOURCE, "Машина с VIN ${request.vin} уже есть")
+        }
         if (vehicles.existsByPlateNumber(request.plateNumber)) duplicatePlate(request.plateNumber)
         val vehicle = Vehicle(
             vin = request.vin,
@@ -65,7 +70,13 @@ class VehicleService(
 
     /** Свободные машины в радиусе, ближайшие первыми. Страница запрашивается с запасом в одну запись. */
     @Transactional(readOnly = true)
-    fun nearby(latitude: Double, longitude: Double, radiusM: Int, page: Int, size: Int): SliceResponse<NearbyVehicleResponse> {
+    fun nearby(
+        latitude: Double,
+        longitude: Double,
+        radiusM: Int,
+        page: Int,
+        size: Int,
+    ): SliceResponse<NearbyVehicleResponse> {
         val box = Geo.boundingBox(latitude, longitude, radiusM.toDouble())
         val rows = vehicles.findNearbyAvailable(
             lat = latitude,
@@ -86,11 +97,24 @@ class VehicleService(
         return SliceResponse(content, page, size, rows.size > size)
     }
 
-    /** Карточные поля пишутся через JPA с проверкой version: гонка с бронью или телеметрией даст 409. */
+    /**
+     * Карточные поля пишутся через JPA с проверкой version: гонка с бронью или телеметрией даст 409.
+     * Модель меняется только у свободной машины или на обслуживании: от класса модели зависят допуск водителя и тариф.
+     */
     @Transactional
     fun update(id: UUID, request: UpdateVehicleRequest): VehicleResponse {
         val vehicle = find(id)
-        if (vehicle.status == VehicleStatus.DECOMMISSIONED) conflict(ErrorCode.INVALID_STATUS_TRANSITION, "Машина списана")
+        if (vehicle.status ==
+            VehicleStatus.DECOMMISSIONED
+        ) {
+            conflict(ErrorCode.INVALID_STATUS_TRANSITION, "Машина списана")
+        }
+        if (vehicle.model.id != request.modelId && vehicle.status !in MODEL_CHANGE_STATUSES) {
+            conflict(
+                ErrorCode.VEHICLE_NOT_AVAILABLE,
+                "Модель машины ${vehicle.plateNumber} нельзя менять, пока она в статусе ${vehicle.status}",
+            )
+        }
         if (vehicles.existsByPlateNumberAndIdNot(request.plateNumber, id)) duplicatePlate(request.plateNumber)
         vehicle.updateCard(request.plateNumber, models.find(request.modelId))
         return vehicles.saveAndFlush(vehicle).toResponse()
@@ -138,6 +162,10 @@ class VehicleService(
 
     private fun duplicatePlate(plate: String): Nothing =
         conflict(ErrorCode.DUPLICATE_RESOURCE, "Машина с госномером $plate уже есть")
+
+    private companion object {
+        val MODEL_CHANGE_STATUSES = setOf(VehicleStatus.AVAILABLE, VehicleStatus.SERVICE)
+    }
 
     private fun filter(vehicleClass: VehicleClass?, status: VehicleStatus?): Specification<Vehicle> =
         Specification { root, _, cb ->

@@ -28,7 +28,9 @@ data class VehicleState(
     val plateNumber: String,
 )
 
-interface VehicleRepository : JpaRepository<Vehicle, UUID>, JpaSpecificationExecutor<Vehicle> {
+interface VehicleRepository :
+    JpaRepository<Vehicle, UUID>,
+    JpaSpecificationExecutor<Vehicle> {
 
     @EntityGraph(attributePaths = ["model", "currentZone"])
     fun findWithModelById(id: UUID): Vehicle?

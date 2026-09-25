@@ -39,16 +39,32 @@ class RentalFlowIT : IntegrationTest() {
         economyModel = fixtures.model("ECONOMY", serviceIntervalKm = 15000)
         businessModel = fixtures.model("BUSINESS", brand = "BMW")
         basicTariff = fixtures.basicTariff(listOf(economyModel))
-        businessTariff = fixtures.basicTariff(listOf(businessModel), name = "Бизнес", pricePerMinute = 15, deposit = 5000, freeMinutes = 15)
+        businessTariff =
+            fixtures.basicTariff(
+                listOf(businessModel),
+                name = "Бизнес",
+                pricePerMinute = 15,
+                deposit = 5000,
+                freeMinutes = 15,
+            )
         childSeat = fixtures.option("CHILD_SEAT", 150, "PER_RENTAL")
         franchise = fixtures.option("FRANCHISE_REDUCTION", 2, "PER_MINUTE")
         vehicle = fixtures.vehicle(economyModel, odometerKm = 5000, fuel = 80)
     }
 
-    private fun client(balance: Number = 5000, birthDate: LocalDate = LocalDate.of(1995, 5, 15), firstIssuedAt: LocalDate = LocalDate.of(2019, 6, 1)) =
-        fixtures.readyClient(balance = balance, birthDate = birthDate, firstIssuedAt = firstIssuedAt, support = support)
+    private fun client(
+        balance: Number = 5000,
+        birthDate: LocalDate = LocalDate.of(1995, 5, 15),
+        firstIssuedAt: LocalDate = LocalDate.of(2019, 6, 1),
+    ) = fixtures.readyClient(balance = balance, birthDate = birthDate, firstIssuedAt = firstIssuedAt, support = support)
 
-    private fun bothOptions() = listOf(mapOf("optionId" to childSeat, "quantity" to 1), mapOf("optionId" to franchise, "quantity" to 1))
+    private fun bothOptions() = listOf(
+        mapOf("optionId" to childSeat, "quantity" to 1),
+        mapOf(
+            "optionId" to franchise,
+            "quantity" to 1,
+        ),
+    )
 
     private fun wallet(userId: UUID) = api.get("/api/v1/wallets/$userId")
 
@@ -99,7 +115,9 @@ class RentalFlowIT : IntegrationTest() {
         assertThat(finished.uuid("$.finishZoneId")).isEqualTo(zones["city"])
         assertThat(wallet(clientId).decimal("$.balance")).isEqualByComparingTo("4364")
         assertThat(wallet(clientId).decimal("$.heldAmount")).isEqualByComparingTo("0")
-        assertThat(paymentTypes(clientId)).containsExactlyInAnyOrder("TOP_UP", "DEPOSIT_HOLD", "RENTAL_CHARGE", "DEPOSIT_RELEASE")
+        assertThat(
+            paymentTypes(clientId),
+        ).containsExactlyInAnyOrder("TOP_UP", "DEPOSIT_HOLD", "RENTAL_CHARGE", "DEPOSIT_RELEASE")
         assertThat(vehicleStatus()).isEqualTo("AVAILABLE")
         assertThat(api.get("/api/v1/rentals/$rentalId").path<List<Any>>("$.options")).hasSize(2)
     }
@@ -113,7 +131,12 @@ class RentalFlowIT : IntegrationTest() {
 
         val statuses = try {
             listOf(first, second)
-                .map { clientId -> pool.submit<Int> { start.await(); fixtures.book(clientId, vehicle).status } }
+                .map { clientId ->
+                    pool.submit<Int> {
+                        start.await()
+                        fixtures.book(clientId, vehicle).status
+                    }
+                }
                 .also { start.countDown() }
                 .map { it.get(30, TimeUnit.SECONDS) }
         } finally {
@@ -209,7 +232,9 @@ class RentalFlowIT : IntegrationTest() {
         api.post("/api/v1/rentals/$rentalId/finish")
 
         assertThat(vehicleStatus()).isEqualTo("SERVICE")
-        assertThat(api.get("/api/v1/maintenance-tasks", "vehicleId" to vehicle).path<List<String>>("$.content[*].taskType"))
+        assertThat(
+            api.get("/api/v1/maintenance-tasks", "vehicleId" to vehicle).path<List<String>>("$.content[*].taskType"),
+        )
             .containsExactly("REFUELING")
     }
 
@@ -225,6 +250,31 @@ class RentalFlowIT : IntegrationTest() {
         assertThat(card.status).isEqualTo(200)
         assertThat(vehicleStatus()).isEqualTo("RESERVED")
         assertThat(api.get("/api/v1/vehicles/$vehicle").path<Int>("$.odometerKm")).isEqualTo(5003)
+    }
+
+    @Test
+    fun `model of a reserved vehicle cannot be changed`() {
+        fixtures.book(client(), vehicle)
+
+        val response = api.put(
+            "/api/v1/vehicles/$vehicle",
+            mapOf(
+                "plateNumber" to "Т778ТТ178",
+                "modelId" to businessModel,
+            ),
+        )
+
+        assertThat(response.status).isEqualTo(409)
+        assertThat(api.get("/api/v1/vehicles/$vehicle").string("$.model.vehicleClass")).isEqualTo("ECONOMY")
+    }
+
+    @Test
+    fun `option quantity inside the list is validated`() {
+        val response = fixtures.book(client(), vehicle, listOf(mapOf("optionId" to childSeat, "quantity" to 0)))
+
+        assertThat(response.status).isEqualTo(400)
+        assertThat(response.path<List<String>>("$.errors[*].field")).anyMatch { it.contains("quantity") }
+        assertThat(vehicleStatus()).isEqualTo("AVAILABLE")
     }
 
     @Test
@@ -293,8 +343,14 @@ class RentalFlowIT : IntegrationTest() {
         api.put(
             "/api/v1/tariffs/$basicTariff",
             mapOf(
-                "name" to "Базовый", "pricePerMinute" to 100, "pricePerKm" to 30, "waitingPricePerMinute" to 25,
-                "freeReservationMinutes" to 0, "depositAmount" to 9000, "validFrom" to Instant.parse("2026-01-01T00:00:00Z"),
+                "name" to "Базовый",
+                "pricePerMinute" to 100,
+                "pricePerKm" to 30,
+                "waitingPricePerMinute" to 25,
+                "freeReservationMinutes" to 0,
+                "depositAmount" to 9000,
+                "validFrom" to Instant.parse("2026-01-01T00:00:00Z"),
+                "modelIds" to listOf(economyModel),
             ),
         )
         val rental = api.get("/api/v1/rentals/$rentalId")
@@ -390,7 +446,11 @@ class RentalFlowIT : IntegrationTest() {
         val wrongTariff = fixtures.book(clientId, vehicle, tariffId = businessTariff)
         val inactiveOption = fixtures.book(clientId, vehicle, listOf(mapOf("optionId" to inactive)))
         val noTariff = fixtures.book(clientId, cargo)
-        val duplicateOptions = fixtures.book(clientId, vehicle, listOf(mapOf("optionId" to childSeat), mapOf("optionId" to childSeat)))
+        val duplicateOptions = fixtures.book(
+            clientId,
+            vehicle,
+            listOf(mapOf("optionId" to childSeat), mapOf("optionId" to childSeat)),
+        )
 
         assertThat(wrongTariff.status).isEqualTo(422)
         assertThat(wrongTariff.errorType()).isEqualTo("tariff-not-applicable")

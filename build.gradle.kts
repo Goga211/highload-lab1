@@ -4,7 +4,13 @@ plugins {
     alias(libs.plugins.kotlin.jpa)
     alias(libs.plugins.spring.boot)
     alias(libs.plugins.spring.dependency.management)
+    alias(libs.plugins.ktlint)
     jacoco
+}
+
+// Конвенции Kotlin проверяются ktlint в задаче check, правила лежат в .editorconfig.
+ktlint {
+    version = libs.versions.ktlint.cli.get()
 }
 
 group = "ru.itmo"
@@ -13,7 +19,12 @@ version = "1.0.0"
 kotlin {
     jvmToolchain(21)
     compilerOptions {
-        freeCompilerArgs.addAll("-Xjsr305=strict", "-Xannotation-default-target=param-property")
+        // -Xemit-jvm-type-annotations: List<@Valid Item> должен попасть в байткод, иначе вложенная валидация молчит.
+        freeCompilerArgs.addAll(
+            "-Xjsr305=strict",
+            "-Xannotation-default-target=param-property",
+            "-Xemit-jvm-type-annotations",
+        )
     }
 }
 

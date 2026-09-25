@@ -20,10 +20,7 @@ import ru.itmo.carsharing.users.repository.AppUserRepository
 import java.util.UUID
 
 @Service
-class UserService(
-    private val users: AppUserRepository,
-    private val events: ApplicationEventPublisher,
-) {
+class UserService(private val users: AppUserRepository, private val events: ApplicationEventPublisher) {
 
     @Transactional
     fun create(request: CreateUserRequest): UserResponse {

@@ -75,6 +75,12 @@ class TrafficFine(
         disputeReason = reason
     }
 
+    /** Обжалование отклонено: штраф снова на клиенте, если он был перевыставлен, иначе на компании. */
+    fun rejectDispute() {
+        if (status != FineStatus.DISPUTED) invalidTransition("Штраф", status, FineStatus.REBILLED)
+        moveTo(if (rental != null) FineStatus.REBILLED else FineStatus.NO_RENTAL)
+    }
+
     fun cancel() {
         moveTo(FineStatus.CANCELLED)
     }

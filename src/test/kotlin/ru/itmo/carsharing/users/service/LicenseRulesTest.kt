@@ -2,8 +2,8 @@ package ru.itmo.carsharing.users.service
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import ru.itmo.carsharing.users.entity.LicenseCategory
 import ru.itmo.carsharing.users.entity.LicenseCategoriesConverter
+import ru.itmo.carsharing.users.entity.LicenseCategory
 import java.time.LocalDate
 
 class LicenseRulesTest {
@@ -12,7 +12,12 @@ class LicenseRulesTest {
 
     @Test
     fun `consistent license has no violations`() {
-        val violations = LicenseRules.checkDates(issued, issued.plusYears(10), issued.minusYears(3), setOf(LicenseCategory.B))
+        val violations = LicenseRules.checkDates(
+            issued,
+            issued.plusYears(10),
+            issued.minusYears(3),
+            setOf(LicenseCategory.B),
+        )
 
         assertThat(violations).isEmpty()
     }
@@ -28,14 +33,24 @@ class LicenseRulesTest {
 
     @Test
     fun `category B date cannot be later than issue date`() {
-        val violations = LicenseRules.checkDates(issued, issued.plusYears(10), issued.plusDays(1), setOf(LicenseCategory.B))
+        val violations = LicenseRules.checkDates(
+            issued,
+            issued.plusYears(10),
+            issued.plusDays(1),
+            setOf(LicenseCategory.B),
+        )
 
         assertThat(violations.map { it.field }).containsExactly("firstIssuedAt")
     }
 
     @Test
     fun `category B is required`() {
-        val violations = LicenseRules.checkDates(issued, issued.plusYears(10), issued, setOf(LicenseCategory.A, LicenseCategory.C))
+        val violations = LicenseRules.checkDates(
+            issued,
+            issued.plusYears(10),
+            issued,
+            setOf(LicenseCategory.A, LicenseCategory.C),
+        )
 
         assertThat(violations.map { it.field }).containsExactly("categories")
     }
@@ -61,7 +76,9 @@ class LicenseRulesTest {
         val converter = LicenseCategoriesConverter()
 
         assertThat(converter.convertToDatabaseColumn(setOf(LicenseCategory.C, LicenseCategory.B))).isEqualTo("B,C")
-        assertThat(converter.convertToEntityAttribute("B,BE")).containsExactlyInAnyOrder(LicenseCategory.B, LicenseCategory.BE)
+        assertThat(
+            converter.convertToEntityAttribute("B,BE"),
+        ).containsExactlyInAnyOrder(LicenseCategory.B, LicenseCategory.BE)
         assertThat(converter.convertToDatabaseColumn(null)).isNull()
     }
 }

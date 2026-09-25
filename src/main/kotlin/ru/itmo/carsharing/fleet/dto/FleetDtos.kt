@@ -163,7 +163,4 @@ data class VehicleResponse(
     val version: Long,
 )
 
-data class NearbyVehicleResponse(
-    val distanceM: Int,
-    val vehicle: VehicleResponse,
-)
+data class NearbyVehicleResponse(val distanceM: Int, val vehicle: VehicleResponse)

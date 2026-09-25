@@ -13,8 +13,7 @@ fun conflict(code: ErrorCode, detail: String): Nothing = throw ApiException(code
 
 fun unprocessable(code: ErrorCode, detail: String): Nothing = throw ApiException(code, detail)
 
-fun invalidTransition(resource: String, from: Enum<*>, to: Enum<*>): Nothing =
-    throw ApiException(
-        ErrorCode.INVALID_STATUS_TRANSITION,
-        "$resource: переход из статуса $from в $to невозможен",
-    )
+fun invalidTransition(resource: String, from: Enum<*>, to: Enum<*>): Nothing = throw ApiException(
+    ErrorCode.INVALID_STATUS_TRANSITION,
+    "$resource: переход из статуса $from в $to невозможен",
+)

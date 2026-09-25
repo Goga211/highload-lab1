@@ -13,7 +13,9 @@ import ru.itmo.carsharing.billing.entity.Wallet
 import ru.itmo.carsharing.billing.mapper.toResponse
 import ru.itmo.carsharing.billing.repository.PaymentRepository
 import ru.itmo.carsharing.billing.repository.WalletRepository
+import ru.itmo.carsharing.common.error.ErrorCode
 import ru.itmo.carsharing.common.error.NotFoundException
+import ru.itmo.carsharing.common.error.unprocessable
 import ru.itmo.carsharing.common.money.Money
 import ru.itmo.carsharing.common.web.PageResponse
 import ru.itmo.carsharing.common.web.Paging
@@ -23,10 +25,7 @@ import java.math.BigDecimal
 import java.util.UUID
 
 @Service
-class WalletService(
-    private val wallets: WalletRepository,
-    private val payments: PaymentRepository,
-) {
+class WalletService(private val wallets: WalletRepository, private val payments: PaymentRepository) {
 
     /** Счёт открывается в транзакции создания клиента: без клиента нет счёта и наоборот. */
     @EventListener
@@ -39,16 +38,23 @@ class WalletService(
 
     /**
      * Пополнение имитирует оплату картой. Ключ из заголовка Idempotency-Key проверяется
-     * после блокировки счёта: два одинаковых запроса подряд не зачислят деньги дважды.
+     * после блокировки счёта: два одинаковых запроса подряд не зачислят деньги дважды,
+     * а тот же ключ с другой суммой отклоняется, это уже другая операция.
      */
     @Transactional
     fun topUp(userId: UUID, amount: BigDecimal, clientKey: String): WalletResponse {
         val wallet = wallets.findByUserIdForUpdate(userId) ?: throw walletNotFound(userId)
         val key = IdempotencyKeys.topUp(userId, clientKey.trim())
-        if (!payments.existsByIdempotencyKey(key)) {
-            val value = Money.of(amount)
+        val value = Money.of(amount)
+        val previous = payments.findByIdempotencyKey(key)
+        if (previous == null) {
             wallet.credit(value)
             payments.save(Payment(userId, null, PaymentType.TOP_UP, value, key))
+        } else if (previous.amount.compareTo(value) != 0) {
+            unprocessable(
+                ErrorCode.IDEMPOTENCY_KEY_REUSED,
+                "Ключ $clientKey уже использован для пополнения на ${previous.amount}, запрошено $value",
+            )
         }
         return wallet.toResponse()
     }

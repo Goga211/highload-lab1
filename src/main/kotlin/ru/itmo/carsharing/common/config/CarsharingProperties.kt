@@ -3,10 +3,7 @@ package ru.itmo.carsharing.common.config
 import org.springframework.boot.context.properties.ConfigurationProperties
 
 @ConfigurationProperties("carsharing")
-data class CarsharingProperties(
-    val rental: Rental = Rental(),
-    val fleet: Fleet = Fleet(),
-) {
+data class CarsharingProperties(val rental: Rental = Rental(), val fleet: Fleet = Fleet()) {
     data class Rental(
         /** Сколько живёт бронь до старта. Должно быть больше бесплатных минут тарифа. */
         val reservationTtlMinutes: Long = 30,

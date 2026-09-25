@@ -38,12 +38,7 @@ data class PageResponse<T>(
 }
 
 /** Бесконечная прокрутка: без общего количества, только признак следующей страницы. */
-data class SliceResponse<T>(
-    val content: List<T>,
-    val page: Int,
-    val size: Int,
-    val hasNext: Boolean,
-) {
+data class SliceResponse<T>(val content: List<T>, val page: Int, val size: Int, val hasNext: Boolean) {
     companion object {
         fun <E : Any, T> from(slice: Slice<E>, mapper: (E) -> T): SliceResponse<T> = SliceResponse(
             content = slice.content.map(mapper),

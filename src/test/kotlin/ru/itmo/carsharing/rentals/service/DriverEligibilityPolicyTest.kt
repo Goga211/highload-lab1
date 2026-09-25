@@ -29,7 +29,16 @@ class DriverEligibilityPolicyTest {
         role = role,
         status = status,
         birthDate = birthDate,
-        approvedLicense = if (withLicense) LicenseSnapshot(UUID.randomUUID(), expiresAt, firstIssuedAt, categories) else null,
+        approvedLicense = if (withLicense) {
+            LicenseSnapshot(
+                UUID.randomUUID(),
+                expiresAt,
+                firstIssuedAt,
+                categories,
+            )
+        } else {
+            null
+        },
     )
 
     private fun check(profile: DriverProfile, vehicleClass: VehicleClass = VehicleClass.ECONOMY) =

@@ -64,7 +64,10 @@ class FineService(
     fun rebill(id: UUID): FineResponse {
         val fine = lock(id)
         if (fine.status != FineStatus.RECEIVED) {
-            conflict(ErrorCode.INVALID_STATUS_TRANSITION, "Перевыставить можно только новый штраф, статус ${fine.status}")
+            conflict(
+                ErrorCode.INVALID_STATUS_TRANSITION,
+                "Перевыставить можно только новый штраф, статус ${fine.status}",
+            )
         }
         val rental = rentals.findCovering(
             fine.vehicleId,
@@ -84,6 +87,14 @@ class FineService(
     fun dispute(id: UUID, reason: String): FineResponse {
         val fine = lock(id)
         fine.dispute(reason.trim())
+        return fine.toResponse()
+    }
+
+    /** Обжалование отклонено: деньги не двигаются, списанный штраф так и остаётся на клиенте. */
+    @Transactional
+    fun rejectDispute(id: UUID): FineResponse {
+        val fine = lock(id)
+        fine.rejectDispute()
         return fine.toResponse()
     }
 

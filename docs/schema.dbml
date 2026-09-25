@@ -1,0 +1,331 @@
+// Каршеринг, ЛР1. Схема базы по миграциям Liquibase (src/main/resources/db/changelog).
+// Открывается на https://dbdiagram.io: Import -> DBML.
+// Группы таблиц совпадают с доменными пакетами и будущими сервисами ЛР2.
+// Частичные уникальные индексы DBML не выражает, они описаны в note у таблиц.
+
+Project carsharing {
+  database_type: 'PostgreSQL'
+  Note: '''
+  Ключи uuid генерирует приложение. Деньги numeric(12,2), время timestamptz.
+  Перечисления хранятся строками varchar с CHECK на список значений.
+  У каждой таблицы-сущности есть created_at и updated_at.
+  Связи между доменами (ссылки с пометкой cross-domain) в ЛР2 станут uuid без внешнего ключа.
+  '''
+}
+
+// ---------- users ----------
+
+Table app_user {
+  id uuid [pk]
+  email varchar(254) [not null, unique]
+  phone varchar(16) [not null, unique]
+  full_name varchar(200) [not null]
+  birth_date date [not null]
+  role varchar(32) [not null, note: 'CLIENT, SUPPORT, FLEET_MECHANIC, SUPERVISOR']
+  status varchar(32) [not null, note: 'ACTIVE, BLOCKED']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table driver_license {
+  id uuid [pk]
+  user_id uuid [not null, ref: > app_user.id]
+  number varchar(10) [not null, unique, note: '2 цифры региона, серия из 2 цифр или 2 букв, 6 цифр']
+  issued_at date [not null]
+  expires_at date [not null, note: 'позже issued_at и не дальше 13 лет от неё']
+  first_issued_at date [not null, note: 'дата получения категории B, не позже issued_at']
+  categories varchar(64) [not null, note: 'строка вида B,BE']
+  verification_status varchar(32) [not null, note: 'PENDING, APPROVED, REJECTED, REPLACED']
+  verified_by uuid [ref: > app_user.id]
+  verified_at timestamptz
+  rejection_reason varchar(500)
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, created_at) [name: 'ix_driver_license_user_created_at']
+  }
+  Note: 'ux_driver_license_approved_per_user: UNIQUE (user_id) WHERE verification_status = APPROVED'
+}
+
+// ---------- fleet ----------
+
+Table vehicle_model {
+  id uuid [pk]
+  brand varchar(64) [not null]
+  model varchar(64) [not null]
+  vehicle_class varchar(32) [not null, note: 'ECONOMY, COMFORT, BUSINESS, CARGO']
+  fuel_type varchar(32) [not null, note: 'PETROL, DIESEL, ELECTRIC, HYBRID']
+  seats integer [not null, note: '1..9']
+  service_interval_km integer [not null, note: 'пробег между плановыми ТО, > 0']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (brand, model) [unique, name: 'uq_vehicle_model_brand_model']
+  }
+}
+
+Table parking_zone {
+  id uuid [pk]
+  name varchar(100) [not null, unique]
+  zone_type varchar(32) [not null, note: 'HOME, BUSINESS, AIRPORT, RESTRICTED']
+  center_latitude "double precision" [not null]
+  center_longitude "double precision" [not null]
+  radius_m integer [not null, note: '> 0']
+  is_finish_allowed boolean [not null]
+  finish_surcharge numeric(12,2) [not null, note: '>= 0']
+  is_active boolean [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table vehicle {
+  id uuid [pk]
+  vin varchar(17) [not null, unique]
+  plate_number varchar(9) [not null, unique]
+  model_id uuid [not null, ref: > vehicle_model.id]
+  status varchar(32) [not null, note: 'AVAILABLE, RESERVED, IN_RENTAL, SERVICE, DECOMMISSIONED']
+  odometer_km integer [not null]
+  fuel_level_percent integer [not null, note: '0..100']
+  latitude "double precision" [not null]
+  longitude "double precision" [not null]
+  current_zone_id uuid [ref: > parking_zone.id]
+  last_service_odometer_km integer [not null, note: 'от 0 до odometer_km']
+  telemetry_updated_at timestamptz [not null]
+  version bigint [not null, default: 0, note: 'растёт при каждом изменении статуса и телеметрии']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    status [name: 'ix_vehicle_status']
+    model_id [name: 'ix_vehicle_model']
+  }
+  Note: 'ix_vehicle_available_location: (latitude, longitude) WHERE status = AVAILABLE'
+}
+
+Table maintenance_task {
+  id uuid [pk]
+  vehicle_id uuid [not null, ref: > vehicle.id]
+  task_type varchar(32) [not null, note: 'SCHEDULED_SERVICE, REPAIR, WASHING, REFUELING']
+  status varchar(32) [not null, note: 'OPEN, IN_PROGRESS, DONE, CANCELLED']
+  description varchar(500)
+  assigned_to uuid [ref: > app_user.id, note: 'механик, cross-domain']
+  opened_at timestamptz [not null]
+  closed_at timestamptz
+  odometer_at_open_km integer [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (vehicle_id, status) [name: 'ix_maintenance_task_vehicle_status']
+  }
+  Note: 'ux_maintenance_task_open_per_type: UNIQUE (vehicle_id, task_type) WHERE status IN (OPEN, IN_PROGRESS)'
+}
+
+Table spare_part {
+  id uuid [pk]
+  article varchar(64) [not null, unique]
+  name varchar(200) [not null]
+  stock_quantity integer [not null, note: '>= 0']
+  price numeric(12,2) [not null, note: '> 0']
+  version bigint [not null, default: 0]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table maintenance_part {
+  id uuid [pk]
+  task_id uuid [not null, ref: > maintenance_task.id]
+  part_id uuid [not null, ref: > spare_part.id]
+  quantity integer [not null, note: '> 0']
+  unit_price_snapshot numeric(12,2) [not null, note: 'цена на момент списания']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (task_id, part_id) [unique, name: 'uq_maintenance_part_task_part']
+  }
+  Note: 'Many-to-Many с полями: наряд и запчасть'
+}
+
+Table spare_part_compatibility {
+  part_id uuid [not null, ref: > spare_part.id]
+  model_id uuid [not null, ref: > vehicle_model.id]
+
+  indexes {
+    (part_id, model_id) [pk]
+    model_id [name: 'ix_spare_part_compatibility_model']
+  }
+  Note: 'Чистая Many-to-Many: запчасть и модель'
+}
+
+// ---------- rentals ----------
+
+Table tariff {
+  id uuid [pk]
+  name varchar(100) [not null]
+  price_per_minute numeric(12,2) [not null]
+  price_per_km numeric(12,2) [not null]
+  waiting_price_per_minute numeric(12,2) [not null]
+  free_reservation_minutes integer [not null, note: '0..120 и меньше времени жизни брони']
+  deposit_amount numeric(12,2) [not null]
+  valid_from timestamptz [not null]
+  valid_to timestamptz [note: 'NULL или позже valid_from']
+  status varchar(32) [not null, note: 'ACTIVE, ARCHIVED']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table tariff_vehicle_model {
+  tariff_id uuid [not null, ref: > tariff.id]
+  model_id uuid [not null, ref: > vehicle_model.id, note: 'cross-domain']
+
+  indexes {
+    (tariff_id, model_id) [pk]
+    model_id [name: 'ix_tariff_vehicle_model_model']
+  }
+  Note: 'Чистая Many-to-Many: тариф и модель'
+}
+
+Table rental_option {
+  id uuid [pk]
+  code varchar(64) [not null, unique]
+  name varchar(200) [not null]
+  price numeric(12,2) [not null]
+  price_unit varchar(32) [not null, note: 'PER_RENTAL, PER_MINUTE']
+  is_active boolean [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table rental {
+  id uuid [pk]
+  user_id uuid [not null, ref: > app_user.id, note: 'cross-domain']
+  vehicle_id uuid [not null, ref: > vehicle.id, note: 'cross-domain']
+  tariff_id uuid [not null, ref: > tariff.id]
+  status varchar(32) [not null, note: 'RESERVED, ACTIVE, COMPLETED, CANCELLED, EXPIRED']
+  reserved_at timestamptz [not null]
+  started_at timestamptz
+  finished_at timestamptz
+  cancelled_at timestamptz
+  cancel_reason varchar(500)
+  start_zone_id uuid [ref: > parking_zone.id, note: 'cross-domain']
+  finish_zone_id uuid [ref: > parking_zone.id, note: 'cross-domain']
+  start_odometer_km integer
+  finish_odometer_km integer [note: 'не меньше start_odometer_km']
+  applied_price_per_minute numeric(12,2) [not null, note: 'ставки скопированы из тарифа при брони']
+  applied_price_per_km numeric(12,2) [not null]
+  applied_waiting_price_per_minute numeric(12,2) [not null]
+  applied_free_reservation_minutes integer [not null]
+  applied_deposit numeric(12,2) [not null]
+  duration_minutes integer
+  waiting_minutes integer
+  distance_km integer
+  options_amount numeric(12,2)
+  zone_surcharge numeric(12,2)
+  total_amount numeric(12,2) [note: '>= 0']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, reserved_at) [name: 'ix_rental_user_reserved_at']
+    (vehicle_id, started_at) [name: 'ix_rental_vehicle_started_at']
+  }
+  Note: '''
+  ux_rental_active_vehicle: UNIQUE (vehicle_id) WHERE status IN (RESERVED, ACTIVE)
+  ux_rental_active_user: UNIQUE (user_id) WHERE status IN (RESERVED, ACTIVE)
+  ix_rental_reserved_pending: (reserved_at) WHERE status = RESERVED, для планировщика
+  '''
+}
+
+Table rental_option_item {
+  id uuid [pk]
+  rental_id uuid [not null, ref: > rental.id]
+  option_id uuid [not null, ref: > rental_option.id]
+  quantity integer [not null, note: '> 0']
+  unit_price_snapshot numeric(12,2) [not null, note: 'цена на момент брони']
+  price_unit_snapshot varchar(32) [not null]
+  total_amount numeric(12,2) [note: 'заполняется на финише']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (rental_id, option_id) [unique, name: 'uq_rental_option_item_rental_option']
+  }
+  Note: 'Many-to-Many с полями: аренда и опция'
+}
+
+Table traffic_fine {
+  id uuid [pk]
+  vehicle_id uuid [not null, ref: > vehicle.id, note: 'cross-domain']
+  rental_id uuid [ref: > rental.id, note: 'NULL, если аренды в момент нарушения не было']
+  payment_id uuid [ref: - payment.id, note: 'платёж FINE_CHARGE, cross-domain']
+  resolution_number varchar(25) [not null, unique]
+  violated_at timestamptz [not null]
+  amount numeric(12,2) [not null]
+  status varchar(32) [not null, note: 'RECEIVED, REBILLED, NO_RENTAL, DISPUTED, CANCELLED']
+  dispute_reason varchar(500)
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    status [name: 'ix_traffic_fine_status']
+  }
+}
+
+// ---------- billing ----------
+
+Table wallet {
+  id uuid [pk]
+  user_id uuid [not null, unique, ref: - app_user.id, note: 'один счёт на клиента, cross-domain']
+  balance numeric(12,2) [not null, note: 'может быть отрицательным: долг']
+  held_amount numeric(12,2) [not null, note: '>= 0, замороженные депозиты']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+}
+
+Table payment {
+  id uuid [pk]
+  user_id uuid [not null, ref: > app_user.id, note: 'cross-domain']
+  rental_id uuid [ref: > rental.id, note: 'пуст только у TOP_UP, cross-domain']
+  payment_type varchar(32) [not null, note: 'TOP_UP, DEPOSIT_HOLD, DEPOSIT_RELEASE, RENTAL_CHARGE, FINE_CHARGE, REFUND']
+  amount numeric(12,2) [not null, note: '> 0']
+  status varchar(32) [not null, note: 'PENDING, SUCCEEDED, FAILED']
+  idempotency_key varchar(200) [not null, unique, note: 'одна операция даёт ровно один платёж']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (user_id, created_at) [name: 'ix_payment_user_created_at']
+  }
+}
+
+TableGroup users {
+  app_user
+  driver_license
+}
+
+TableGroup fleet {
+  vehicle_model
+  parking_zone
+  vehicle
+  maintenance_task
+  spare_part
+  maintenance_part
+  spare_part_compatibility
+}
+
+TableGroup rentals {
+  tariff
+  tariff_vehicle_model
+  rental_option
+  rental
+  rental_option_item
+  traffic_fine
+}
+
+TableGroup billing {
+  wallet
+  payment
+}

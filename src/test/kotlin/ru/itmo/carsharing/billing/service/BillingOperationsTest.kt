@@ -44,7 +44,14 @@ class BillingOperationsTest {
 
         assertThat(wallet.balance).isEqualByComparingTo("2000")
         assertThat(wallet.heldAmount).isEqualByComparingTo("3000")
-        verify { payments.save(match { it.type == PaymentType.DEPOSIT_HOLD && it.idempotencyKey == IdempotencyKeys.depositHold(rentalId) }) }
+        verify {
+            payments.save(
+                match {
+                    it.type == PaymentType.DEPOSIT_HOLD &&
+                        it.idempotencyKey == IdempotencyKeys.depositHold(rentalId)
+                },
+            )
+        }
     }
 
     @Test
@@ -104,7 +111,8 @@ class BillingOperationsTest {
     @Test
     fun `fine charge returns existing payment on repeat`() {
         val fineId = UUID.randomUUID()
-        val existing = Payment(userId, rentalId, PaymentType.FINE_CHARGE, BigDecimal("500"), IdempotencyKeys.fineCharge(fineId))
+        val existing =
+            Payment(userId, rentalId, PaymentType.FINE_CHARGE, BigDecimal("500"), IdempotencyKeys.fineCharge(fineId))
         every { payments.findByIdempotencyKey(IdempotencyKeys.fineCharge(fineId)) } returns existing
 
         val paymentId = billing.chargeFine(userId, rentalId, fineId, BigDecimal("500"))

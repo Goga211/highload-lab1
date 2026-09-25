@@ -41,7 +41,9 @@ class EntityValidationIT : IntegrationTest() {
         assertThatThrownBy { users.saveAndFlush(invalid) }
             .isInstanceOf(ConstraintViolationException::class.java)
             .satisfies({ ex ->
-                val fields = (ex as ConstraintViolationException).constraintViolations.map { it.propertyPath.toString() }
+                val fields = (ex as ConstraintViolationException).constraintViolations.map {
+                    it.propertyPath.toString()
+                }
                 assertThat(fields).contains("email", "phone", "fullName")
             })
         assertThat(users.count()).isZero()

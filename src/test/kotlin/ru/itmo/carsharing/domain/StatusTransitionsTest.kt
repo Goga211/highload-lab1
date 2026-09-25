@@ -52,10 +52,12 @@ class StatusTransitionsTest {
     @CsvSource(
         "RECEIVED, REBILLED, true",
         "RECEIVED, NO_RENTAL, true",
-        "RECEIVED, DISPUTED, true",
+        "RECEIVED, DISPUTED, false",
         "REBILLED, DISPUTED, true",
         "NO_RENTAL, DISPUTED, true",
         "DISPUTED, CANCELLED, true",
+        "DISPUTED, REBILLED, true",
+        "DISPUTED, NO_RENTAL, true",
         "REBILLED, CANCELLED, false",
         "CANCELLED, DISPUTED, false",
     )

@@ -23,10 +23,7 @@ data class Settlement(val charged: BigDecimal, val released: BigDecimal)
  * В ЛР2 это API billing-service, в ЛР4 команды на эти операции пойдут через Kafka.
  */
 @Service
-class BillingOperations(
-    private val wallets: WalletRepository,
-    private val payments: PaymentRepository,
-) {
+class BillingOperations(private val wallets: WalletRepository, private val payments: PaymentRepository) {
 
     @Transactional
     fun holdDeposit(userId: UUID, rentalId: UUID, amount: BigDecimal) {
@@ -54,20 +51,29 @@ class BillingOperations(
         payments.save(Payment(userId, rentalId, PaymentType.DEPOSIT_RELEASE, deposit, key))
     }
 
-    /** Снять холд, списать стоимость, остаток вернуть. Если поездка дороже депозита, баланс уходит в минус. */
+    /**
+     * Снять холд, списать стоимость, остаток вернуть. Если поездка дороже депозита, баланс уходит в минус.
+     * Стоимость всегда больше нуля (минимум минута по ставке больше нуля), поэтому платёж RENTAL_CHARGE
+     * создаётся всегда и его ключ надёжно защищает от повторного расчёта.
+     */
     @Transactional
     fun settleRental(userId: UUID, rentalId: UUID, deposit: BigDecimal, total: BigDecimal): Settlement {
+        require(total.signum() > 0) { "Rental cost must be positive, got $total" }
         val chargeKey = IdempotencyKeys.rentalCharge(rentalId)
         val released = Money.of(deposit - total).max(Money.ZERO)
         if (payments.existsByIdempotencyKey(chargeKey)) return Settlement(Money.of(total), released)
         val wallet = lock(userId)
         wallet.settle(Money.of(deposit), Money.of(total))
-        if (total.signum() > 0) {
-            payments.save(Payment(userId, rentalId, PaymentType.RENTAL_CHARGE, Money.of(total), chargeKey))
-        }
+        payments.save(Payment(userId, rentalId, PaymentType.RENTAL_CHARGE, Money.of(total), chargeKey))
         if (released.signum() > 0) {
             payments.save(
-                Payment(userId, rentalId, PaymentType.DEPOSIT_RELEASE, released, IdempotencyKeys.depositRelease(rentalId)),
+                Payment(
+                    userId,
+                    rentalId,
+                    PaymentType.DEPOSIT_RELEASE,
+                    released,
+                    IdempotencyKeys.depositRelease(rentalId),
+                ),
             )
         }
         return Settlement(Money.of(total), released)
@@ -94,7 +100,6 @@ class BillingOperations(
         payments.save(Payment(userId, rentalId, PaymentType.REFUND, value, key))
     }
 
-    private fun lock(userId: UUID): Wallet =
-        wallets.findByUserIdForUpdate(userId)
-            ?: unprocessable(ErrorCode.INSUFFICIENT_FUNDS, "У пользователя $userId нет счёта")
+    private fun lock(userId: UUID): Wallet = wallets.findByUserIdForUpdate(userId)
+        ?: unprocessable(ErrorCode.INSUFFICIENT_FUNDS, "У пользователя $userId нет счёта")
 }

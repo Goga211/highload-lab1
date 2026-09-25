@@ -19,6 +19,7 @@ import ru.itmo.carsharing.billing.dto.PaymentResponse
 import ru.itmo.carsharing.billing.dto.TopUpRequest
 import ru.itmo.carsharing.billing.dto.WalletResponse
 import ru.itmo.carsharing.billing.service.WalletService
+import ru.itmo.carsharing.common.web.ApiErrors
 import ru.itmo.carsharing.common.web.ApiPaths
 import ru.itmo.carsharing.common.web.PageResponse
 import ru.itmo.carsharing.common.web.Paging
@@ -34,6 +35,7 @@ class WalletController(private val wallets: WalletService) {
     fun get(@PathVariable userId: UUID): WalletResponse = wallets.get(userId)
 
     @PostMapping("/{userId}/top-up")
+    @ApiErrors(422)
     @Operation(summary = "Пополнить счёт. Повтор с тем же Idempotency-Key не зачисляет деньги второй раз")
     fun topUp(
         @PathVariable userId: UUID,

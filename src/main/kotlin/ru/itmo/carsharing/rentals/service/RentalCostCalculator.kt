@@ -47,7 +47,10 @@ object RentalCostCalculator {
 
     fun calculate(input: CostInput): RentalCost {
         val durationMinutes = maxOf(1, startedMinutes(input.startedAt, input.finishedAt))
-        val waitingMinutes = maxOf(0, startedMinutes(input.reservedAt, input.startedAt) - input.rates.freeReservationMinutes)
+        val waitingMinutes = maxOf(
+            0,
+            startedMinutes(input.reservedAt, input.startedAt) - input.rates.freeReservationMinutes,
+        )
         val distanceKm = maxOf(0, input.finishOdometerKm - input.startOdometerKm)
 
         val rideAmount = Money.of(input.rates.pricePerMinute * BigDecimal(durationMinutes))

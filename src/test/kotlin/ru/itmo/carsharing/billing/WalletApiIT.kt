@@ -24,6 +24,18 @@ class WalletApiIT : IntegrationTest() {
     }
 
     @Test
+    fun `same idempotency key with another amount is rejected with 422`() {
+        val clientId = fixtures.createUser()
+        fixtures.topUp(clientId, 1500, key = "pay-1")
+
+        val reused = fixtures.topUp(clientId, 900, key = "pay-1")
+
+        assertThat(reused.status).isEqualTo(422)
+        assertThat(reused.errorType()).isEqualTo("idempotency-key-reused")
+        assertThat(api.get("/api/v1/wallets/$clientId").decimal("$.balance")).isEqualByComparingTo("1500")
+    }
+
+    @Test
     fun `top up without idempotency key or with wrong amount is rejected`() {
         val clientId = fixtures.createUser()
 

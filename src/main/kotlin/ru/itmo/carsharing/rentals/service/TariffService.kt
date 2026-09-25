@@ -3,9 +3,11 @@ package ru.itmo.carsharing.rentals.service
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import ru.itmo.carsharing.common.config.CarsharingProperties
 import ru.itmo.carsharing.common.error.ErrorCode
 import ru.itmo.carsharing.common.error.NotFoundException
 import ru.itmo.carsharing.common.error.conflict
+import ru.itmo.carsharing.common.error.unprocessable
 import ru.itmo.carsharing.common.money.Money
 import ru.itmo.carsharing.common.web.PageResponse
 import ru.itmo.carsharing.common.web.Paging
@@ -23,10 +25,12 @@ import java.util.UUID
 class TariffService(
     private val tariffs: TariffRepository,
     private val fleet: FleetOperations,
+    private val properties: CarsharingProperties,
 ) {
 
     @Transactional
     fun create(request: TariffRequest): TariffResponse {
+        checkFreeMinutes(request.freeReservationMinutes)
         fleet.ensureModelsExist(request.modelIds)
         val tariff = Tariff(
             name = request.name.trim(),
@@ -51,11 +55,13 @@ class TariffService(
         return PageResponse.from(tariffs.findAll(pageable)) { it.toResponse() }
     }
 
-    /** Правка прайса не трогает уже созданные аренды: ставки в них скопированы при брони. */
+    /** PUT заменяет тариф целиком, включая модели. Уже созданные аренды не меняются: ставки в них скопированы. */
     @Transactional
     fun update(id: UUID, request: TariffRequest): TariffResponse {
         val tariff = find(id)
         if (tariff.status == TariffStatus.ARCHIVED) conflict(ErrorCode.INVALID_STATUS_TRANSITION, "Тариф в архиве")
+        checkFreeMinutes(request.freeReservationMinutes)
+        fleet.ensureModelsExist(request.modelIds)
         tariff.name = request.name.trim()
         tariff.pricePerMinute = Money.of(request.pricePerMinute)
         tariff.pricePerKm = Money.of(request.pricePerKm)
@@ -64,10 +70,7 @@ class TariffService(
         tariff.depositAmount = Money.of(request.depositAmount)
         tariff.validFrom = request.validFrom
         tariff.validTo = request.validTo
-        if (request.modelIds.isNotEmpty()) {
-            fleet.ensureModelsExist(request.modelIds)
-            tariff.replaceModels(request.modelIds)
-        }
+        tariff.replaceModels(request.modelIds)
         return tariff.toResponse()
     }
 
@@ -91,4 +94,15 @@ class TariffService(
     }
 
     fun find(id: UUID): Tariff = tariffs.findWithModelsById(id) ?: throw NotFoundException("Тариф", id)
+
+    /** Если бесплатное ожидание не короче жизни брони, платное ожидание никогда не начнётся. */
+    private fun checkFreeMinutes(freeMinutes: Int) {
+        val ttl = properties.rental.reservationTtlMinutes
+        if (freeMinutes >= ttl) {
+            unprocessable(
+                ErrorCode.BUSINESS_RULE_VIOLATION,
+                "Бесплатных минут брони ($freeMinutes) должно быть меньше, чем живёт бронь ($ttl мин)",
+            )
+        }
+    }
 }

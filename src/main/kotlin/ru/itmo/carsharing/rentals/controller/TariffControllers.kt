@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -14,7 +15,9 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import ru.itmo.carsharing.common.web.ApiErrors
 import ru.itmo.carsharing.common.web.ApiPaths
 import ru.itmo.carsharing.common.web.PageResponse
 import ru.itmo.carsharing.common.web.Paging
@@ -35,6 +38,8 @@ import java.util.UUID
 class TariffController(private val tariffs: TariffService) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiErrors(404, 422)
     @Operation(summary = "Создать тариф и привязать к моделям")
     fun create(@Valid @RequestBody request: TariffRequest): ResponseEntity<TariffResponse> {
         val tariff = tariffs.create(request)
@@ -53,7 +58,8 @@ class TariffController(private val tariffs: TariffService) {
     ): PageResponse<TariffResponse> = tariffs.list(page, size)
 
     @PutMapping("/{id}")
-    @Operation(summary = "Изменить тариф. Уже созданные аренды сохраняют свои ставки")
+    @ApiErrors(409, 422)
+    @Operation(summary = "Заменить тариф целиком, включая модели. Уже созданные аренды сохраняют свои ставки")
     fun update(@PathVariable id: UUID, @Valid @RequestBody request: TariffRequest): TariffResponse =
         tariffs.update(id, request)
 
@@ -81,6 +87,8 @@ class TariffController(private val tariffs: TariffService) {
 class RentalOptionController(private val options: RentalOptionService) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiErrors(409)
     @Operation(summary = "Создать опцию")
     fun create(@Valid @RequestBody request: RentalOptionRequest): ResponseEntity<RentalOptionResponse> {
         val option = options.create(request)
@@ -99,14 +107,15 @@ class RentalOptionController(private val options: RentalOptionService) {
     ): PageResponse<RentalOptionResponse> = options.list(page, size)
 
     @PutMapping("/{id}")
-    @Operation(summary = "Изменить опцию")
+    @ApiErrors(422)
+    @Operation(summary = "Изменить опцию. Код опции неизменяем")
     fun update(@PathVariable id: UUID, @Valid @RequestBody request: RentalOptionRequest): RentalOptionResponse =
         options.update(id, request)
 
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Деактивировать опцию")
-    fun delete(@PathVariable id: UUID): ResponseEntity<Void> {
+    fun delete(@PathVariable id: UUID) {
         options.deactivate(id)
-        return ResponseEntity.noContent().build()
     }
 }

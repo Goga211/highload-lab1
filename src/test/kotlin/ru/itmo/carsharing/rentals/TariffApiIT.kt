@@ -46,15 +46,37 @@ class TariffApiIT : IntegrationTest() {
     fun `tariff validation`() {
         val model = fixtures.model()
 
-        val badRange = api.post("/api/v1/tariffs", tariffBody(listOf(model), validTo = Instant.parse("2025-01-01T00:00:00Z")))
+        val badRange = api.post(
+            "/api/v1/tariffs",
+            tariffBody(listOf(model), validTo = Instant.parse("2025-01-01T00:00:00Z")),
+        )
         val unknownModel = api.post("/api/v1/tariffs", tariffBody(listOf(UUID.randomUUID())))
         val negativePrice = api.post("/api/v1/tariffs", tariffBody(listOf(model)) + ("pricePerKm" to 0))
+        val noModels = api.post("/api/v1/tariffs", tariffBody(emptyList()))
+        val freeLongerThanReservation = api.post(
+            "/api/v1/tariffs",
+            tariffBody(listOf(model)) + ("freeReservationMinutes" to 30),
+        )
 
         assertThat(badRange.status).isEqualTo(400)
         assertThat(badRange.path<List<String>>("$.errors[*].field")).contains("validityRangeCorrect")
         assertThat(unknownModel.status).isEqualTo(404)
         assertThat(negativePrice.status).isEqualTo(400)
+        assertThat(noModels.status).isEqualTo(400)
+        assertThat(noModels.path<List<String>>("$.errors[*].field")).contains("modelIds")
+        assertThat(freeLongerThanReservation.status).isEqualTo(422)
         assertThat(api.get("/api/v1/tariffs/${UUID.randomUUID()}").status).isEqualTo(404)
+    }
+
+    @Test
+    fun `put replaces the tariff together with its models`() {
+        val first = fixtures.model()
+        val second = fixtures.model("COMFORT")
+        val id = api.post("/api/v1/tariffs", tariffBody(listOf(first))).id()
+
+        val replaced = api.put("/api/v1/tariffs/$id", tariffBody(listOf(second)))
+
+        assertThat(replaced.path<List<String>>("$.modelIds")).containsExactly(second.toString())
     }
 
     @Test
@@ -85,7 +107,7 @@ class TariffApiIT : IntegrationTest() {
         assertThat(duplicate.status).isEqualTo(409)
         assertThat(badCode.status).isEqualTo(400)
         assertThat(updated.decimal("$.price")).isEqualByComparingTo("200")
-        assertThat(codeChange.status).isEqualTo(409)
+        assertThat(codeChange.status).isEqualTo(422)
         assertThat(api.delete("/api/v1/rental-options/$id").status).isEqualTo(204)
         assertThat(api.get("/api/v1/rental-options/$id").path<Boolean>("$.active")).isFalse()
         assertThat(api.get("/api/v1/rental-options").path<Int>("$.totalElements")).isEqualTo(1)

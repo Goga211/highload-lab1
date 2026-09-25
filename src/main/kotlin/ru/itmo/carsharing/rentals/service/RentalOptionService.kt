@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional
 import ru.itmo.carsharing.common.error.ErrorCode
 import ru.itmo.carsharing.common.error.NotFoundException
 import ru.itmo.carsharing.common.error.conflict
+import ru.itmo.carsharing.common.error.unprocessable
 import ru.itmo.carsharing.common.money.Money
 import ru.itmo.carsharing.common.web.PageResponse
 import ru.itmo.carsharing.common.web.Paging
@@ -48,7 +49,9 @@ class RentalOptionService(private val options: RentalOptionRepository) {
     @Transactional
     fun update(id: UUID, request: RentalOptionRequest): RentalOptionResponse {
         val option = find(id)
-        if (option.code != request.code) conflict(ErrorCode.INVALID_STATUS_TRANSITION, "Код опции менять нельзя")
+        if (option.code != request.code) {
+            unprocessable(ErrorCode.BUSINESS_RULE_VIOLATION, "Код опции ${option.code} менять нельзя")
+        }
         option.name = request.name.trim()
         option.price = Money.of(request.price)
         option.priceUnit = request.priceUnit

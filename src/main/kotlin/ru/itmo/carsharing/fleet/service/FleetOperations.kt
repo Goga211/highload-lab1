@@ -38,12 +38,7 @@ data class TelemetrySnapshot(
     val zoneId: UUID?,
 )
 
-data class ZoneSnapshot(
-    val id: UUID,
-    val name: String,
-    val finishAllowed: Boolean,
-    val finishSurcharge: BigDecimal,
-)
+data class ZoneSnapshot(val id: UUID, val name: String, val finishAllowed: Boolean, val finishSurcharge: BigDecimal)
 
 data class RentalCompletion(val vehicleStatus: VehicleStatus, val createdTasks: List<MaintenanceType>)
 
@@ -75,19 +70,38 @@ class FleetOperations(
     /** Захват машины под бронь. Ноль затронутых строк: машину уже взял другой клиент. */
     @Transactional
     fun reserve(vehicle: VehicleSnapshot) {
-        val moved = vehicles.transitionStatus(vehicle.id, listOf(VehicleStatus.AVAILABLE.name), VehicleStatus.RESERVED.name)
-        if (moved == 0) conflict(ErrorCode.VEHICLE_NOT_AVAILABLE, "Автомобиль ${vehicle.plateNumber} уже забронирован или недоступен")
+        val moved = vehicles.transitionStatus(
+            vehicle.id,
+            listOf(VehicleStatus.AVAILABLE.name),
+            VehicleStatus.RESERVED.name,
+        )
+        if (moved ==
+            0
+        ) {
+            conflict(
+                ErrorCode.VEHICLE_NOT_AVAILABLE,
+                "Автомобиль ${vehicle.plateNumber} уже забронирован или недоступен",
+            )
+        }
     }
 
     @Transactional
     fun releaseReservation(vehicleId: UUID) {
-        val moved = vehicles.transitionStatus(vehicleId, listOf(VehicleStatus.RESERVED.name), VehicleStatus.AVAILABLE.name)
+        val moved = vehicles.transitionStatus(
+            vehicleId,
+            listOf(VehicleStatus.RESERVED.name),
+            VehicleStatus.AVAILABLE.name,
+        )
         check(moved == 1) { "Vehicle $vehicleId is not RESERVED while its rental is being cancelled" }
     }
 
     @Transactional
     fun startRental(vehicleId: UUID): TelemetrySnapshot {
-        val moved = vehicles.transitionStatus(vehicleId, listOf(VehicleStatus.RESERVED.name), VehicleStatus.IN_RENTAL.name)
+        val moved = vehicles.transitionStatus(
+            vehicleId,
+            listOf(VehicleStatus.RESERVED.name),
+            VehicleStatus.IN_RENTAL.name,
+        )
         check(moved == 1) { "Vehicle $vehicleId is not RESERVED while its rental is being started" }
         return readTelemetry(vehicleId)
     }
@@ -95,12 +109,19 @@ class FleetOperations(
     @Transactional(readOnly = true)
     fun readTelemetry(vehicleId: UUID): TelemetrySnapshot {
         val state = state(vehicleId)
-        return TelemetrySnapshot(state.odometerKm, state.fuelLevelPercent, state.latitude, state.longitude, state.currentZoneId)
+        return TelemetrySnapshot(
+            state.odometerKm,
+            state.fuelLevelPercent,
+            state.latitude,
+            state.longitude,
+            state.currentZoneId,
+        )
     }
 
     @Transactional(readOnly = true)
-    fun findZoneAt(latitude: Double, longitude: Double): ZoneSnapshot? =
-        zones.findZoneAt(latitude, longitude)?.let { ZoneSnapshot(it.id, it.name, it.finishAllowed, it.finishSurcharge) }
+    fun findZoneAt(latitude: Double, longitude: Double): ZoneSnapshot? = zones.findZoneAt(latitude, longitude)?.let {
+        ZoneSnapshot(it.id, it.name, it.finishAllowed, it.finishSurcharge)
+    }
 
     /**
      * Машина после поездки: пробег с последнего ТО не меньше порога модели даёт наряд ТО,

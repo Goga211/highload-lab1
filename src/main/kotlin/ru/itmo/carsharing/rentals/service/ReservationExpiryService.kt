@@ -34,7 +34,12 @@ class ReservationExpiryService(
 }
 
 @Component
-@ConditionalOnProperty(prefix = "carsharing.scheduling", name = ["enabled"], havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(
+    prefix = "carsharing.scheduling",
+    name = ["enabled"],
+    havingValue = "true",
+    matchIfMissing = true,
+)
 class ReservationExpiryScheduler(
     private val expiry: ReservationExpiryService,
     private val properties: CarsharingProperties,

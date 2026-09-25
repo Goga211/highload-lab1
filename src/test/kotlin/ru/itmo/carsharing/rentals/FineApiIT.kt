@@ -88,6 +88,37 @@ class FineApiIT : IntegrationTest() {
     }
 
     @Test
+    fun `rejected appeal returns the fine to the client without moving money`() {
+        val clientId = fixtures.readyClient(balance = 5000)
+        val (startedAt, _) = trip(clientId)
+        val fineId = fine(startedAt.plus(Duration.ofMinutes(5))).id()
+        val beforeRebill = api.post("/api/v1/fines/$fineId/dispute", mapOf("reason" to "Рано"))
+        api.post("/api/v1/fines/$fineId/rebill")
+        val balanceAfterFine = api.get("/api/v1/wallets/$clientId").decimal("$.balance")
+        api.post("/api/v1/fines/$fineId/dispute", mapOf("reason" to "Меня там не было"))
+
+        val rejected = api.post("/api/v1/fines/$fineId/reject-dispute")
+        val againRejected = api.post("/api/v1/fines/$fineId/reject-dispute")
+
+        assertThat(beforeRebill.status).isEqualTo(409)
+        assertThat(rejected.status).isEqualTo(200)
+        assertThat(rejected.string("$.status")).isEqualTo("REBILLED")
+        assertThat(api.get("/api/v1/wallets/$clientId").decimal("$.balance")).isEqualByComparingTo(balanceAfterFine)
+        assertThat(againRejected.status).isEqualTo(409)
+    }
+
+    @Test
+    fun `rejected appeal of a company fine keeps it on the company`() {
+        val fineId = fine(clock.instant().minus(Duration.ofDays(2))).id()
+        api.post("/api/v1/fines/$fineId/rebill")
+        api.post("/api/v1/fines/$fineId/dispute", mapOf("reason" to "Номер распознан неверно"))
+
+        val rejected = api.post("/api/v1/fines/$fineId/reject-dispute")
+
+        assertThat(rejected.string("$.status")).isEqualTo("NO_RENTAL")
+    }
+
+    @Test
     fun `fine debt blocks the next booking`() {
         val clientId = fixtures.readyClient(balance = 3000)
         val (startedAt, _) = trip(clientId)
@@ -110,7 +141,12 @@ class FineApiIT : IntegrationTest() {
         val future = fine(Instant.now().plus(Duration.ofDays(1)))
         val unknownVehicle = api.post(
             "/api/v1/fines",
-            mapOf("vehicleId" to UUID.randomUUID(), "resolutionNumber" to "18810177260900000009", "violatedAt" to clock.instant(), "amount" to 500),
+            mapOf(
+                "vehicleId" to UUID.randomUUID(),
+                "resolutionNumber" to "18810177260900000009",
+                "violatedAt" to clock.instant(),
+                "amount" to 500,
+            ),
         )
 
         assertThat(first.status).isEqualTo(201)
@@ -120,7 +156,9 @@ class FineApiIT : IntegrationTest() {
         assertThat(unknownVehicle.status).isEqualTo(404)
         assertThat(api.get("/api/v1/fines", "status" to "RECEIVED").path<Int>("$.totalElements")).isEqualTo(1)
         assertThat(api.get("/api/v1/fines").path<Int>("$.totalElements")).isEqualTo(1)
-        assertThat(api.get("/api/v1/fines/${first.id()}").string("$.resolutionNumber")).isEqualTo("18810177260900000001")
+        assertThat(
+            api.get("/api/v1/fines/${first.id()}").string("$.resolutionNumber"),
+        ).isEqualTo("18810177260900000001")
         assertThat(api.get("/api/v1/fines/${UUID.randomUUID()}").status).isEqualTo(404)
     }
 }

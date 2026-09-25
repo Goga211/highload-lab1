@@ -11,8 +11,12 @@ class FleetApiIT : IntegrationTest() {
     @Test
     fun `vehicle model CRUD with uniqueness`() {
         val body = mapOf(
-            "brand" to "Kia", "model" to "Rio", "vehicleClass" to "ECONOMY",
-            "fuelType" to "PETROL", "seats" to 5, "serviceIntervalKm" to 15000,
+            "brand" to "Kia",
+            "model" to "Rio",
+            "vehicleClass" to "ECONOMY",
+            "fuelType" to "PETROL",
+            "seats" to 5,
+            "serviceIntervalKm" to 15000,
         )
         val created = api.post("/api/v1/vehicle-models", body)
         val duplicate = api.post("/api/v1/vehicle-models", body)
@@ -42,7 +46,14 @@ class FleetApiIT : IntegrationTest() {
     fun `invalid model fields return 400`() {
         val response = api.post(
             "/api/v1/vehicle-models",
-            mapOf("brand" to "", "model" to "X", "vehicleClass" to "ECONOMY", "fuelType" to "PETROL", "seats" to 0, "serviceIntervalKm" to -1),
+            mapOf(
+                "brand" to "",
+                "model" to "X",
+                "vehicleClass" to "ECONOMY",
+                "fuelType" to "PETROL",
+                "seats" to 0,
+                "serviceIntervalKm" to -1,
+            ),
         )
 
         assertThat(response.status).isEqualTo(400)
@@ -57,8 +68,13 @@ class FleetApiIT : IntegrationTest() {
         val updated = api.put(
             "/api/v1/parking-zones/$cityId",
             mapOf(
-                "name" to "Город", "zoneType" to "HOME", "centerLatitude" to Places.CITY_LAT,
-                "centerLongitude" to Places.CITY_LON, "radiusM" to 16000, "finishAllowed" to true, "finishSurcharge" to 0,
+                "name" to "Город",
+                "zoneType" to "HOME",
+                "centerLatitude" to Places.CITY_LAT,
+                "centerLongitude" to Places.CITY_LON,
+                "radiusM" to 16000,
+                "finishAllowed" to true,
+                "finishSurcharge" to 0,
             ),
         )
         val deleted = api.delete("/api/v1/parking-zones/${zones.getValue("airport")}")
@@ -70,8 +86,13 @@ class FleetApiIT : IntegrationTest() {
         val duplicate = api.post(
             "/api/v1/parking-zones",
             mapOf(
-                "name" to "Город", "zoneType" to "HOME", "centerLatitude" to 1.0, "centerLongitude" to 1.0,
-                "radiusM" to 10, "finishAllowed" to true, "finishSurcharge" to 0,
+                "name" to "Город",
+                "zoneType" to "HOME",
+                "centerLatitude" to 1.0,
+                "centerLongitude" to 1.0,
+                "radiusM" to 10,
+                "finishAllowed" to true,
+                "finishSurcharge" to 0,
             ),
         )
         assertThat(duplicate.status).isEqualTo(409)
@@ -83,8 +104,12 @@ class FleetApiIT : IntegrationTest() {
         val modelId = fixtures.model()
 
         val inCity = api.get("/api/v1/vehicles/${fixtures.vehicle(modelId)}")
-        val atAirport = api.get("/api/v1/vehicles/${fixtures.vehicle(modelId, lat = Places.AIRPORT_LAT, lon = Places.AIRPORT_LON)}")
-        val outside = api.get("/api/v1/vehicles/${fixtures.vehicle(modelId, lat = Places.OUTSIDE_LAT, lon = Places.OUTSIDE_LON)}")
+        val atAirport = api.get(
+            "/api/v1/vehicles/${fixtures.vehicle(modelId, lat = Places.AIRPORT_LAT, lon = Places.AIRPORT_LON)}",
+        )
+        val outside = api.get(
+            "/api/v1/vehicles/${fixtures.vehicle(modelId, lat = Places.OUTSIDE_LAT, lon = Places.OUTSIDE_LON)}",
+        )
 
         assertThat(inCity.uuid("$.currentZoneId")).isEqualTo(zones["city"])
         assertThat(atAirport.uuid("$.currentZoneId")).isEqualTo(zones["airport"])
@@ -128,11 +153,18 @@ class FleetApiIT : IntegrationTest() {
 
         val response = api.get(
             "/api/v1/vehicles/nearby",
-            "lat" to Places.CITY_LAT, "lon" to Places.CITY_LON, "radiusM" to 2000, "size" to 1,
+            "lat" to Places.CITY_LAT,
+            "lon" to Places.CITY_LON,
+            "radiusM" to 2000,
+            "size" to 1,
         )
         val second = api.get(
             "/api/v1/vehicles/nearby",
-            "lat" to Places.CITY_LAT, "lon" to Places.CITY_LON, "radiusM" to 2000, "size" to 1, "page" to 1,
+            "lat" to Places.CITY_LAT,
+            "lon" to Places.CITY_LON,
+            "radiusM" to 2000,
+            "size" to 1,
+            "page" to 1,
         )
 
         assertThat(response.path<List<String>>("$.content[*].vehicle.id")).containsExactly(near.toString())
@@ -167,7 +199,10 @@ class FleetApiIT : IntegrationTest() {
 
         val duplicateVin = api.post("/api/v1/vehicles", fixtures.vehicleRequest(modelId) + ("vin" to request["vin"]!!))
         val badVin = api.post("/api/v1/vehicles", fixtures.vehicleRequest(modelId) + ("vin" to "IOQ12345678901234"))
-        val updated = api.put("/api/v1/vehicles/$vehicleId", mapOf("plateNumber" to "Х999ХХ78", "modelId" to otherModel))
+        val updated = api.put(
+            "/api/v1/vehicles/$vehicleId",
+            mapOf("plateNumber" to "Х999ХХ78", "modelId" to otherModel),
+        )
 
         assertThat(duplicateVin.status).isEqualTo(409)
         assertThat(badVin.status).isEqualTo(400)
@@ -186,7 +221,15 @@ class FleetApiIT : IntegrationTest() {
         assertThat(api.get("/api/v1/vehicles/$vehicleId").string("$.status")).isEqualTo("DECOMMISSIONED")
         assertThat(again.status).isEqualTo(409)
         assertThat(fixtures.telemetry(vehicleId, 2000).status).isEqualTo(409)
-        assertThat(api.put("/api/v1/vehicles/$vehicleId", mapOf("plateNumber" to "Х998ХХ78", "modelId" to fixtures.model())).status)
+        assertThat(
+            api.put(
+                "/api/v1/vehicles/$vehicleId",
+                mapOf(
+                    "plateNumber" to "Х998ХХ78",
+                    "modelId" to fixtures.model(),
+                ),
+            ).status,
+        )
             .isEqualTo(409)
         assertThat(api.delete("/api/v1/vehicles/${UUID.randomUUID()}").status).isEqualTo(404)
     }

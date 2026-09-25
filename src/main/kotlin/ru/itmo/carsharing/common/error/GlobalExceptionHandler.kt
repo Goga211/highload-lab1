@@ -125,6 +125,38 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
         request,
     )
 
+    /**
+     * Ошибки уровня Spring MVC (нет параметра, неизвестный путь, не тот метод или Content-Type)
+     * приводятся к тому же виду, что и наши: свой type, русский detail и поле errors.
+     */
+    override fun handleExceptionInternal(
+        ex: Exception,
+        body: Any?,
+        headers: HttpHeaders,
+        statusCode: HttpStatusCode,
+        request: WebRequest,
+    ): ResponseEntity<Any>? {
+        // Для ошибок Spring тело собирается внутри super из ErrorResponse, поэтому дополняем результат.
+        val response = super.handleExceptionInternal(ex, body, headers, statusCode, request)
+        val problem = response?.body as? ProblemDetail
+        if (problem != null && (problem.type == null || problem.type == BLANK_TYPE)) {
+            val code = frameworkCode(statusCode)
+            problem.type = URI.create("$ERROR_TYPE_BASE/${code.slug}")
+            problem.title = code.title
+            FrameworkErrors.detail(ex)?.let { problem.detail = it }
+            problem.setProperty("errors", FrameworkErrors.violations(ex))
+        }
+        return response
+    }
+
+    private fun frameworkCode(status: HttpStatusCode): ErrorCode = when (status.value()) {
+        ErrorCode.ENDPOINT_NOT_FOUND.status.value() -> ErrorCode.ENDPOINT_NOT_FOUND
+        ErrorCode.METHOD_NOT_ALLOWED.status.value() -> ErrorCode.METHOD_NOT_ALLOWED
+        ErrorCode.NOT_ACCEPTABLE.status.value() -> ErrorCode.NOT_ACCEPTABLE
+        ErrorCode.UNSUPPORTED_MEDIA_TYPE.status.value() -> ErrorCode.UNSUPPORTED_MEDIA_TYPE
+        else -> if (status.is4xxClientError) ErrorCode.BAD_REQUEST else ErrorCode.INTERNAL_ERROR
+    }
+
     private fun toResponse(
         code: ErrorCode,
         detail: String,
@@ -152,5 +184,6 @@ class GlobalExceptionHandler : ResponseEntityExceptionHandler() {
 
     companion object {
         const val ERROR_TYPE_BASE = "https://carsharing.local/errors"
+        private val BLANK_TYPE: URI = URI.create("about:blank")
     }
 }

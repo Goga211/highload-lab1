@@ -8,8 +8,17 @@ import java.util.UUID
 
 class UserApiIT : IntegrationTest() {
 
-    private fun userBody(email: String = "ivan@test.local", phone: String = "+79991112233", birthDate: Any = LocalDate.of(1995, 5, 15)) =
-        mapOf("email" to email, "phone" to phone, "fullName" to "Иван Клиентов", "birthDate" to birthDate, "role" to "CLIENT")
+    private fun userBody(
+        email: String = "ivan@test.local",
+        phone: String = "+79991112233",
+        birthDate: Any = LocalDate.of(1995, 5, 15),
+    ) = mapOf(
+        "email" to email,
+        "phone" to phone,
+        "fullName" to "Иван Клиентов",
+        "birthDate" to birthDate,
+        "role" to "CLIENT",
+    )
 
     @Test
     fun `client is created with 201, location header and an opened wallet`() {
