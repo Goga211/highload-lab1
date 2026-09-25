@@ -1,0 +1,36 @@
+name: carsharing
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-carsharing}
+      POSTGRES_USER: ${DB_USER:-carsharing}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-carsharing}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-carsharing}
+      DB_USER: ${DB_USER:-carsharing}
+      DB_PASSWORD: ${DB_PASSWORD:-carsharing}
+      RENTAL_RESERVATION_TTL_MINUTES: ${RENTAL_RESERVATION_TTL_MINUTES:-30}
+      FUEL_LOW_THRESHOLD_PERCENT: ${FUEL_LOW_THRESHOLD_PERCENT:-15}
+      LIQUIBASE_CONTEXTS: ${LIQUIBASE_CONTEXTS:-default,demo}
+    ports:
+      - "${APP_PORT:-8080}:8080"
+
+volumes:
+  postgres-data:
