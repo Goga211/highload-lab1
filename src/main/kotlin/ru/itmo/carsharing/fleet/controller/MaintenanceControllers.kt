@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -14,7 +15,9 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import ru.itmo.carsharing.common.web.ApiErrors
 import ru.itmo.carsharing.common.web.ApiPaths
 import ru.itmo.carsharing.common.web.PageResponse
 import ru.itmo.carsharing.common.web.Paging
@@ -39,8 +42,12 @@ import java.util.UUID
 class MaintenanceController(private val maintenance: MaintenanceService) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiErrors(404, 409)
     @Operation(summary = "Открыть наряд вручную. Машина должна быть свободна или уже на обслуживании")
-    fun create(@Valid @RequestBody request: CreateMaintenanceTaskRequest): ResponseEntity<MaintenanceTaskDetailsResponse> {
+    fun create(
+        @Valid @RequestBody request: CreateMaintenanceTaskRequest,
+    ): ResponseEntity<MaintenanceTaskDetailsResponse> {
         val task = maintenance.create(request)
         return created("${ApiPaths.BASE}/maintenance-tasks/${task.task.id}", task)
     }
@@ -59,11 +66,13 @@ class MaintenanceController(private val maintenance: MaintenanceService) {
     fun get(@PathVariable id: UUID): MaintenanceTaskDetailsResponse = maintenance.get(id)
 
     @PostMapping("/{id}/take")
+    @ApiErrors(409, 422)
     @Operation(summary = "Механик берёт наряд в работу")
     fun take(@PathVariable id: UUID, @Valid @RequestBody request: TakeTaskRequest): MaintenanceTaskDetailsResponse =
         maintenance.take(id, request.mechanicId)
 
     @PostMapping("/{id}/parts")
+    @ApiErrors(409, 422)
     @Operation(summary = "Списать запчасть со склада по текущей цене")
     fun writeOffPart(
         @PathVariable id: UUID,
@@ -71,11 +80,13 @@ class MaintenanceController(private val maintenance: MaintenanceService) {
     ): MaintenanceTaskDetailsResponse = maintenance.writeOffPart(id, request)
 
     @PostMapping("/{id}/close")
+    @ApiErrors(409)
     @Operation(summary = "Закрыть наряд. Для ТО обновляет пробег последнего ТО")
     fun close(@PathVariable id: UUID): MaintenanceTaskDetailsResponse = maintenance.close(id)
 
     @PostMapping("/{id}/cancel")
-    @Operation(summary = "Отменить наряд")
+    @ApiErrors(409)
+    @Operation(summary = "Отменить наряд. Списанные в него запчасти возвращаются на склад")
     fun cancel(@PathVariable id: UUID): MaintenanceTaskDetailsResponse = maintenance.cancel(id)
 }
 
@@ -85,6 +96,8 @@ class MaintenanceController(private val maintenance: MaintenanceService) {
 class SparePartController(private val spareParts: SparePartService) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiErrors(409)
     @Operation(summary = "Добавить запчасть на склад")
     fun create(@Valid @RequestBody request: SparePartRequest): ResponseEntity<SparePartResponse> {
         val part = spareParts.create(request)
@@ -103,15 +116,17 @@ class SparePartController(private val spareParts: SparePartService) {
     ): PageResponse<SparePartResponse> = spareParts.list(page, size)
 
     @PutMapping("/{id}")
+    @ApiErrors(409)
     @Operation(summary = "Изменить карточку запчасти и остаток")
     fun update(@PathVariable id: UUID, @Valid @RequestBody request: SparePartRequest): SparePartResponse =
         spareParts.update(id, request)
 
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ApiErrors(409)
     @Operation(summary = "Удалить запчасть, только если её не списывали")
-    fun delete(@PathVariable id: UUID): ResponseEntity<Void> {
+    fun delete(@PathVariable id: UUID) {
         spareParts.delete(id)
-        return ResponseEntity.noContent().build()
     }
 
     @GetMapping("/{id}/models")

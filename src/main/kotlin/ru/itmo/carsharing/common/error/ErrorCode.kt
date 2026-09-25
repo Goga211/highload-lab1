@@ -10,6 +10,11 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     NOT_FOUND(HttpStatus.NOT_FOUND, "not-found", "Resource not found"),
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed"),
     MALFORMED_REQUEST(HttpStatus.BAD_REQUEST, "malformed-request", "Malformed request"),
+    BAD_REQUEST(HttpStatus.BAD_REQUEST, "bad-request", "Bad request"),
+    ENDPOINT_NOT_FOUND(HttpStatus.NOT_FOUND, "endpoint-not-found", "Endpoint not found"),
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "method-not-allowed", "Method not allowed"),
+    NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE, "not-acceptable", "Not acceptable"),
+    UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "unsupported-media-type", "Unsupported media type"),
 
     DUPLICATE_RESOURCE(HttpStatus.CONFLICT, "duplicate-resource", "Resource already exists"),
     RESOURCE_IN_USE(HttpStatus.CONFLICT, "resource-in-use", "Resource is referenced by other data"),
@@ -31,6 +36,7 @@ enum class ErrorCode(val status: HttpStatus, val slug: String, val title: String
     RESERVATION_EXPIRED(HttpStatus.CONFLICT, "reservation-expired", "Reservation has expired"),
     INCOMPATIBLE_PART(HttpStatus.UNPROCESSABLE_CONTENT, "incompatible-part", "Spare part is incompatible"),
     TELEMETRY_REJECTED(HttpStatus.UNPROCESSABLE_CONTENT, "telemetry-rejected", "Telemetry is rejected"),
+    IDEMPOTENCY_KEY_REUSED(HttpStatus.UNPROCESSABLE_CONTENT, "idempotency-key-reused", "Idempotency key is reused"),
     BUSINESS_RULE_VIOLATION(HttpStatus.UNPROCESSABLE_CONTENT, "business-rule-violation", "Business rule violated"),
 
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "internal-error", "Internal server error"),

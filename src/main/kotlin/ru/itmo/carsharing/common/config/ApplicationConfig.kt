@@ -1,7 +1,5 @@
 package ru.itmo.carsharing.common.config
 
-import io.swagger.v3.oas.models.OpenAPI
-import io.swagger.v3.oas.models.info.Info
 import jakarta.validation.ClockProvider
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.validation.autoconfigure.ValidationConfigurationCustomizer
@@ -21,20 +19,14 @@ class ApplicationConfig {
     @Bean
     fun validationClock(clock: Clock): ValidationConfigurationCustomizer =
         ValidationConfigurationCustomizer { configuration -> configuration.clockProvider(ClockProvider { clock }) }
-
-    @Bean
-    fun openApi(): OpenAPI = OpenAPI().info(
-        Info()
-            .title("Carsharing API")
-            .version("v1")
-            .description(
-                "Каршеринг: пользователи и ВУ, парк и обслуживание, тарифы, аренды, штрафы, счета. " +
-                    "Лабораторная работа 1 по курсу \"Высокопроизводительные системы\".",
-            ),
-    )
 }
 
 @Configuration(proxyBeanMethods = false)
 @EnableScheduling
-@ConditionalOnProperty(prefix = "carsharing.scheduling", name = ["enabled"], havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(
+    prefix = "carsharing.scheduling",
+    name = ["enabled"],
+    havingValue = "true",
+    matchIfMissing = true,
+)
 class SchedulingConfig

@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -14,7 +15,9 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import ru.itmo.carsharing.common.web.ApiErrors
 import ru.itmo.carsharing.common.web.ApiPaths
 import ru.itmo.carsharing.common.web.PageResponse
 import ru.itmo.carsharing.common.web.Paging
@@ -33,6 +36,8 @@ import java.util.UUID
 class VehicleModelController(private val models: VehicleModelService) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiErrors(409)
     @Operation(summary = "Добавить модель в справочник")
     fun create(@Valid @RequestBody request: VehicleModelRequest): ResponseEntity<VehicleModelResponse> {
         val model = models.create(request)
@@ -51,15 +56,17 @@ class VehicleModelController(private val models: VehicleModelService) {
     ): PageResponse<VehicleModelResponse> = models.list(page, size)
 
     @PutMapping("/{id}")
+    @ApiErrors(409)
     @Operation(summary = "Изменить модель")
     fun update(@PathVariable id: UUID, @Valid @RequestBody request: VehicleModelRequest): VehicleModelResponse =
         models.update(id, request)
 
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @ApiErrors(409)
     @Operation(summary = "Удалить модель, только если на неё нет ссылок")
-    fun delete(@PathVariable id: UUID): ResponseEntity<Void> {
+    fun delete(@PathVariable id: UUID) {
         models.delete(id)
-        return ResponseEntity.noContent().build()
     }
 }
 
@@ -69,6 +76,8 @@ class VehicleModelController(private val models: VehicleModelService) {
 class ParkingZoneController(private val zones: ParkingZoneService) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiErrors(409)
     @Operation(summary = "Создать зону: центр, радиус, разрешён ли финиш, доплата")
     fun create(@Valid @RequestBody request: ParkingZoneRequest): ResponseEntity<ParkingZoneResponse> {
         val zone = zones.create(request)
@@ -87,14 +96,15 @@ class ParkingZoneController(private val zones: ParkingZoneService) {
     ): PageResponse<ParkingZoneResponse> = zones.list(page, size)
 
     @PutMapping("/{id}")
+    @ApiErrors(409)
     @Operation(summary = "Изменить зону")
     fun update(@PathVariable id: UUID, @Valid @RequestBody request: ParkingZoneRequest): ParkingZoneResponse =
         zones.update(id, request)
 
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Деактивировать зону: на неё ссылаются аренды, физически не удаляется")
-    fun delete(@PathVariable id: UUID): ResponseEntity<Void> {
+    fun delete(@PathVariable id: UUID) {
         zones.deactivate(id)
-        return ResponseEntity.noContent().build()
     }
 }
