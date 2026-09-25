@@ -76,7 +76,12 @@ class MaintenanceService(
     }
 
     @Transactional(readOnly = true)
-    fun list(status: MaintenanceStatus?, vehicleId: UUID?, page: Int, size: Int): PageResponse<MaintenanceTaskResponse> {
+    fun list(
+        status: MaintenanceStatus?,
+        vehicleId: UUID?,
+        page: Int,
+        size: Int,
+    ): PageResponse<MaintenanceTaskResponse> {
         val pageable = Paging.of(page, size, Sort.by("openedAt").descending())
         return PageResponse.from(tasks.findAll(filter(status, vehicleId), pageable)) { it.toResponse() }
     }
@@ -93,24 +98,26 @@ class MaintenanceService(
         return task.toDetailsResponse()
     }
 
-    /** Списание запчасти: наряд в работе, деталь подходит к модели, остаток уменьшается условным UPDATE. */
+    /**
+     * Списание запчасти: наряд в работе, деталь подходит к модели, остаток уменьшается условным UPDATE.
+     * Сущность запчасти читается уже после UPDATE, чтобы в контексте не осталось устаревшего остатка.
+     */
     @Transactional
     fun writeOffPart(id: UUID, request: WriteOffPartRequest): MaintenanceTaskDetailsResponse {
         val task = lockTask(id)
         if (task.status != MaintenanceStatus.IN_PROGRESS) {
             conflict(ErrorCode.INVALID_STATUS_TRANSITION, "Списывать запчасти можно только в наряд в работе")
         }
-        val part = spareParts.findByIdOrNull(request.partId) ?: throw NotFoundException("Запчасть", request.partId)
+        val partId = request.partId
+        if (!spareParts.existsById(partId)) throw NotFoundException("Запчасть", partId)
         val modelId = vehicles.findState(task.vehicle.id)?.modelId ?: throw NotFoundException("Машина", task.vehicle.id)
-        if (!spareParts.isCompatible(part.id, modelId)) {
-            unprocessable(ErrorCode.INCOMPATIBLE_PART, "Запчасть ${part.article} не подходит к модели машины")
+        if (!spareParts.isCompatible(partId, modelId)) {
+            unprocessable(ErrorCode.INCOMPATIBLE_PART, "Запчасть $partId не подходит к модели машины")
         }
-        if (spareParts.decrementStock(part.id, request.quantity) == 0) {
-            conflict(
-                ErrorCode.INSUFFICIENT_STOCK,
-                "На складе не хватает запчасти ${part.article}: нужно ${request.quantity}",
-            )
+        if (spareParts.decrementStock(partId, request.quantity) == 0) {
+            conflict(ErrorCode.INSUFFICIENT_STOCK, "На складе не хватает запчасти $partId: нужно ${request.quantity}")
         }
+        val part = spareParts.findByIdOrNull(partId) ?: throw NotFoundException("Запчасть", partId)
         task.addPart(part, request.quantity, part.price)
         tasks.flush()
         return task.toDetailsResponse()
@@ -131,16 +138,23 @@ class MaintenanceService(
         return task.toDetailsResponse()
     }
 
+    /** Отмена: работы не было, поэтому списанные в наряд запчасти возвращаются на склад. */
     @Transactional
     fun cancel(id: UUID): MaintenanceTaskDetailsResponse {
         val vehicleId = lockVehicleOfTask(id)
         val task = lockTask(id)
         task.cancel(clock.instant())
+        task.releaseParts().forEach { spareParts.incrementStock(it.part.id, it.quantity) }
         vehicles.releaseFromServiceIfDone(vehicleId)
         return task.toDetailsResponse()
     }
 
-    private fun openTask(vehicleId: UUID, type: MaintenanceType, odometerKm: Int, description: String?): MaintenanceTask {
+    private fun openTask(
+        vehicleId: UUID,
+        type: MaintenanceType,
+        odometerKm: Int,
+        description: String?,
+    ): MaintenanceTask {
         val vehicle: Vehicle = vehicles.getReferenceById(vehicleId)
         val task = MaintenanceTask(
             vehicle = vehicle,
@@ -161,7 +175,8 @@ class MaintenanceService(
         return vehicleId
     }
 
-    private fun lockTask(id: UUID): MaintenanceTask = tasks.findByIdForUpdate(id) ?: throw NotFoundException("Наряд", id)
+    private fun lockTask(id: UUID): MaintenanceTask =
+        tasks.findByIdForUpdate(id) ?: throw NotFoundException("Наряд", id)
 
     private fun filter(status: MaintenanceStatus?, vehicleId: UUID?): Specification<MaintenanceTask> =
         Specification { root, _, cb ->

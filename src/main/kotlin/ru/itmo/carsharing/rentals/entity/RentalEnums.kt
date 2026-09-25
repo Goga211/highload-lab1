@@ -25,6 +25,10 @@ enum class RentalStatus {
     }
 }
 
+/**
+ * Штраф сначала разбирается (REBILLED клиенту или NO_RENTAL на компании), потом его можно оспорить.
+ * Удовлетворённое обжалование отменяет штраф, отклонённое возвращает его в прежний статус.
+ */
 enum class FineStatus {
     RECEIVED,
     REBILLED,
@@ -34,9 +38,9 @@ enum class FineStatus {
     ;
 
     fun canTransitionTo(target: FineStatus): Boolean = when (this) {
-        RECEIVED -> target == REBILLED || target == NO_RENTAL || target == DISPUTED
+        RECEIVED -> target == REBILLED || target == NO_RENTAL
         REBILLED, NO_RENTAL -> target == DISPUTED
-        DISPUTED -> target == CANCELLED
+        DISPUTED -> target == CANCELLED || target == REBILLED || target == NO_RENTAL
         CANCELLED -> false
     }
 }

@@ -83,6 +83,13 @@ class MaintenanceTask(
         closedAt = at
     }
 
+    /** Отмена наряда: работы не было, списанные запчасти снимаются с наряда и возвращаются вызывающему. */
+    fun releaseParts(): List<MaintenancePart> {
+        val released = parts.toList()
+        parts.clear()
+        return released
+    }
+
     /** Повторное списание той же запчасти увеличивает количество, цена остаётся на момент первого списания. */
     fun addPart(part: SparePart, quantity: Int, unitPrice: BigDecimal): MaintenancePart {
         val existing = parts.firstOrNull { it.part.id == part.id }

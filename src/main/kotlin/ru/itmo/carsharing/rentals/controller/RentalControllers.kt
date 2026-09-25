@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -12,7 +13,9 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
+import ru.itmo.carsharing.common.web.ApiErrors
 import ru.itmo.carsharing.common.web.ApiPaths
 import ru.itmo.carsharing.common.web.PageResponse
 import ru.itmo.carsharing.common.web.Paging
@@ -34,12 +37,11 @@ import java.util.UUID
 @RestController
 @RequestMapping("${ApiPaths.BASE}/rentals")
 @Tag(name = "Аренды", description = "Бронь, старт, завершение, отмена, история поездок")
-class RentalController(
-    private val commands: RentalService,
-    private val queries: RentalQueryService,
-) {
+class RentalController(private val commands: RentalService, private val queries: RentalQueryService) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiErrors(404, 409, 422)
     @Operation(summary = "Забронировать машину. Депозит замораживается на счёте")
     fun book(@Valid @RequestBody request: CreateRentalRequest): ResponseEntity<RentalResponse> {
         val rental = commands.book(request)
@@ -60,6 +62,7 @@ class RentalController(
     ): PageResponse<RentalResponse> = queries.list(status, userId, page, size)
 
     @GetMapping("/history")
+    @ApiErrors(404)
     @Operation(summary = "Поездки клиента: бесконечная прокрутка без общего количества")
     fun history(
         @RequestParam userId: UUID,
@@ -68,14 +71,17 @@ class RentalController(
     ): SliceResponse<RentalResponse> = queries.history(userId, page, size)
 
     @PostMapping("/{id}/start")
+    @ApiErrors(409)
     @Operation(summary = "Открыть машину: аренда становится активной")
     fun start(@PathVariable id: UUID): RentalResponse = commands.start(id)
 
     @PostMapping("/{id}/finish")
+    @ApiErrors(409, 422)
     @Operation(summary = "Завершить аренду. Координаты и одометр берутся из телеметрии машины")
     fun finish(@PathVariable id: UUID): RentalResponse = commands.finish(id)
 
     @PostMapping("/{id}/cancel")
+    @ApiErrors(409)
     @Operation(summary = "Отменить бронь. Активную аренду отменить нельзя, только завершить")
     fun cancel(@PathVariable id: UUID, @Valid @RequestBody request: CancelRentalRequest): RentalResponse =
         commands.cancel(id, request.reason)
@@ -87,6 +93,8 @@ class RentalController(
 class FineController(private val fines: FineService) {
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    @ApiErrors(404, 409)
     @Operation(summary = "Ввести постановление")
     fun create(@Valid @RequestBody request: FineRequest): ResponseEntity<FineResponse> {
         val fine = fines.create(request)
@@ -106,15 +114,23 @@ class FineController(private val fines: FineService) {
     ): PageResponse<FineResponse> = fines.list(status, page, size)
 
     @PostMapping("/{id}/rebill")
+    @ApiErrors(409)
     @Operation(summary = "Найти аренду по машине и времени и списать сумму с клиента")
     fun rebill(@PathVariable id: UUID): FineResponse = fines.rebill(id)
 
     @PostMapping("/{id}/dispute")
-    @Operation(summary = "Оспорить штраф")
+    @ApiErrors(409)
+    @Operation(summary = "Оспорить штраф после перевыставления или если аренды не было")
     fun dispute(@PathVariable id: UUID, @Valid @RequestBody request: DisputeFineRequest): FineResponse =
         fines.dispute(id, request.reason)
 
+    @PostMapping("/{id}/reject-dispute")
+    @ApiErrors(409)
+    @Operation(summary = "Обжалование отклонено: штраф возвращается в REBILLED или NO_RENTAL")
+    fun rejectDispute(@PathVariable id: UUID): FineResponse = fines.rejectDispute(id)
+
     @PostMapping("/{id}/cancel")
+    @ApiErrors(409)
     @Operation(summary = "Обжалование удовлетворено: штраф отменяется, списанное возвращается")
     fun cancel(@PathVariable id: UUID): FineResponse = fines.cancel(id)
 }

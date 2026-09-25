@@ -53,8 +53,10 @@ data class TariffRequest(
     val validFrom: Instant,
     val validTo: Instant? = null,
 
+    /** Тариф без моделей никогда не применится, поэтому хотя бы одна модель обязательна. */
+    @field:NotEmpty
     @field:Size(max = MAX_TARIFF_MODELS)
-    val modelIds: Set<UUID> = emptySet(),
+    val modelIds: Set<UUID>,
 ) {
     @get:JsonIgnore
     @get:AssertTrue(message = "validTo должен быть позже validFrom")
@@ -122,9 +124,8 @@ data class CreateRentalRequest(
     val vehicleId: UUID,
     val tariffId: UUID? = null,
 
-    @field:Valid
     @field:Size(max = MAX_OPTIONS)
-    val options: List<OptionSelection> = emptyList(),
+    val options: List<@Valid OptionSelection> = emptyList(),
 ) {
     @get:JsonIgnore
     @get:AssertTrue(message = "опции не должны повторяться")

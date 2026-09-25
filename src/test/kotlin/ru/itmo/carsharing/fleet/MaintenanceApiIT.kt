@@ -23,7 +23,12 @@ class MaintenanceApiIT : IntegrationTest() {
         mechanicId = fixtures.createUser("FLEET_MECHANIC")
     }
 
-    private fun part(article: String = "OIL-${fixtures.next()}", stock: Int = 10, price: Number = 650, compatible: Boolean = true): UUID {
+    private fun part(
+        article: String = "OIL-${fixtures.next()}",
+        stock: Int = 10,
+        price: Number = 650,
+        compatible: Boolean = true,
+    ): UUID {
         val id = api.post(
             "/api/v1/spare-parts",
             mapOf("article" to article, "name" to "Масляный фильтр", "stockQuantity" to stock, "price" to price),
@@ -32,8 +37,14 @@ class MaintenanceApiIT : IntegrationTest() {
         return id
     }
 
-    private fun openTask(type: String = "REPAIR"): ApiResponse =
-        api.post("/api/v1/maintenance-tasks", mapOf("vehicleId" to vehicleId, "taskType" to type, "description" to "Стук в подвеске"))
+    private fun openTask(type: String = "REPAIR"): ApiResponse = api.post(
+        "/api/v1/maintenance-tasks",
+        mapOf(
+            "vehicleId" to vehicleId,
+            "taskType" to type,
+            "description" to "Стук в подвеске",
+        ),
+    )
 
     private fun take(taskId: UUID, mechanic: UUID = mechanicId) =
         api.post("/api/v1/maintenance-tasks/$taskId/take", mapOf("mechanicId" to mechanic))
@@ -101,6 +112,21 @@ class MaintenanceApiIT : IntegrationTest() {
     }
 
     @Test
+    fun `cancelled task returns written off parts to stock`() {
+        val partId = part(stock = 5)
+        val taskId = openTask().uuid("$.task.id")
+        take(taskId)
+        writeOff(taskId, partId, 3)
+
+        val cancelled = api.post("/api/v1/maintenance-tasks/$taskId/cancel")
+
+        assertThat(cancelled.string("$.task.status")).isEqualTo("CANCELLED")
+        assertThat(cancelled.path<List<Any>>("$.parts")).isEmpty()
+        assertThat(api.get("/api/v1/spare-parts/$partId").path<Int>("$.stockQuantity")).isEqualTo(5)
+        assertThat(vehicleStatus()).isEqualTo("AVAILABLE")
+    }
+
+    @Test
     fun `second open task of the same type is rejected`() {
         openTask("WASHING")
 
@@ -143,7 +169,13 @@ class MaintenanceApiIT : IntegrationTest() {
         val partId = part(stock = 1)
         val secondVehicle = fixtures.vehicle(modelId)
         val firstTask = openTask().uuid("$.task.id")
-        val secondTask = api.post("/api/v1/maintenance-tasks", mapOf("vehicleId" to secondVehicle, "taskType" to "REPAIR"))
+        val secondTask = api.post(
+            "/api/v1/maintenance-tasks",
+            mapOf(
+                "vehicleId" to secondVehicle,
+                "taskType" to "REPAIR",
+            ),
+        )
             .uuid("$.task.id")
         take(firstTask)
         take(secondTask, fixtures.createUser("FLEET_MECHANIC"))
@@ -163,7 +195,10 @@ class MaintenanceApiIT : IntegrationTest() {
 
         assertThat(openTask().status).isEqualTo(409)
         assertThat(
-            api.post("/api/v1/maintenance-tasks", mapOf("vehicleId" to UUID.randomUUID(), "taskType" to "REPAIR")).status,
+            api.post(
+                "/api/v1/maintenance-tasks",
+                mapOf("vehicleId" to UUID.randomUUID(), "taskType" to "REPAIR"),
+            ).status,
         ).isEqualTo(404)
     }
 
@@ -192,8 +227,24 @@ class MaintenanceApiIT : IntegrationTest() {
         val partId = part(article = "PADS-1")
         val otherModel = fixtures.model("COMFORT")
 
-        val duplicate = api.post("/api/v1/spare-parts", mapOf("article" to "PADS-1", "name" to "X", "stockQuantity" to 1, "price" to 1))
-        val updated = api.put("/api/v1/spare-parts/$partId", mapOf("article" to "PADS-1", "name" to "Колодки", "stockQuantity" to 40, "price" to 4100))
+        val duplicate = api.post(
+            "/api/v1/spare-parts",
+            mapOf(
+                "article" to "PADS-1",
+                "name" to "X",
+                "stockQuantity" to 1,
+                "price" to 1,
+            ),
+        )
+        val updated = api.put(
+            "/api/v1/spare-parts/$partId",
+            mapOf(
+                "article" to "PADS-1",
+                "name" to "Колодки",
+                "stockQuantity" to 40,
+                "price" to 4100,
+            ),
+        )
         val models = api.put("/api/v1/spare-parts/$partId/models", mapOf("modelIds" to listOf(modelId, otherModel)))
         val unknownModel = api.put("/api/v1/spare-parts/$partId/models", mapOf("modelIds" to listOf(UUID.randomUUID())))
         val list = api.get("/api/v1/spare-parts")
@@ -218,7 +269,12 @@ class MaintenanceApiIT : IntegrationTest() {
         val start = CountDownLatch(1)
         val pool = Executors.newFixedThreadPool(actions.size)
         try {
-            val futures = actions.map { action -> pool.submit<Int> { start.await(); action() } }
+            val futures = actions.map { action ->
+                pool.submit<Int> {
+                    start.await()
+                    action()
+                }
+            }
             start.countDown()
             return futures.map { it.get(30, TimeUnit.SECONDS) }
         } finally {

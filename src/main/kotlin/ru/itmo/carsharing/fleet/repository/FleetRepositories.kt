@@ -51,7 +51,9 @@ interface ParkingZoneRepository : JpaRepository<ParkingZone, UUID> {
     fun findZoneIdAt(lat: Double, lon: Double): UUID?
 }
 
-interface MaintenanceTaskRepository : JpaRepository<MaintenanceTask, UUID>, JpaSpecificationExecutor<MaintenanceTask> {
+interface MaintenanceTaskRepository :
+    JpaRepository<MaintenanceTask, UUID>,
+    JpaSpecificationExecutor<MaintenanceTask> {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select t from MaintenanceTask t where t.id = :id")
@@ -81,8 +83,6 @@ interface MaintenanceTaskRepository : JpaRepository<MaintenanceTask, UUID>, JpaS
     ): Boolean
 
     fun existsByVehicleIdAndStatusIn(vehicleId: UUID, statuses: Collection<MaintenanceStatus>): Boolean
-
-    fun findAllByVehicleIdAndStatusIn(vehicleId: UUID, statuses: Collection<MaintenanceStatus>): List<MaintenanceTask>
 }
 
 interface SparePartRepository : JpaRepository<SparePart, UUID> {
@@ -100,6 +100,17 @@ interface SparePartRepository : JpaRepository<SparePart, UUID> {
         nativeQuery = true,
     )
     fun decrementStock(id: UUID, quantity: Int): Int
+
+    /** Возврат на склад при отмене наряда. */
+    @Modifying(flushAutomatically = true)
+    @Query(
+        value = """
+        UPDATE spare_part SET stock_quantity = stock_quantity + :quantity, version = version + 1, updated_at = now()
+        WHERE id = :id
+        """,
+        nativeQuery = true,
+    )
+    fun incrementStock(id: UUID, quantity: Int): Int
 
     @Query(
         """
