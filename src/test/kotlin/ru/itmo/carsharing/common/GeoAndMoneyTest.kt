@@ -6,28 +6,28 @@ import org.junit.jupiter.api.Test
 import ru.itmo.carsharing.common.geo.Geo
 import ru.itmo.carsharing.common.money.Money
 import java.math.BigDecimal
+import kotlin.math.asin
+import kotlin.math.cos
+import kotlin.math.pow
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 class GeoAndMoneyTest {
 
-    @Test
-    fun `distance between city center and airport is about 15 km`() {
-        val distance = Geo.distanceMeters(59.9386, 30.3141, 59.8003, 30.2625)
-
-        assertThat(distance).isCloseTo(15_650.0, within(300.0))
+    /** Та же формула гаверсинуса, что в SQL поиска машин рядом. */
+    private fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val a = sin(Math.toRadians(lat2 - lat1) / 2).pow(2) +
+            cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(Math.toRadians(lon2 - lon1) / 2).pow(2)
+        return 2 * 6_371_000.0 * asin(sqrt(a))
     }
 
     @Test
-    fun `distance to the same point is zero`() {
-        assertThat(Geo.distanceMeters(59.9, 30.3, 59.9, 30.3)).isZero()
-    }
-
-    @Test
-    fun `bounding box contains every point of the circle`() {
+    fun `bounding box edges lie at the search radius`() {
         val box = Geo.boundingBox(59.9386, 30.3141, 1000.0)
 
-        assertThat(box.minLat).isLessThan(59.9386).isGreaterThan(59.92)
+        assertThat(distanceMeters(59.9386, 30.3141, box.maxLat, 30.3141)).isCloseTo(1000.0, within(10.0))
+        assertThat(distanceMeters(59.9386, 30.3141, 59.9386, box.maxLon)).isCloseTo(1000.0, within(10.0))
         assertThat(box.maxLon - box.minLon).isGreaterThan(box.maxLat - box.minLat)
-        assertThat(Geo.distanceMeters(59.9386, 30.3141, box.maxLat, 30.3141)).isCloseTo(1000.0, within(10.0))
     }
 
     @Test

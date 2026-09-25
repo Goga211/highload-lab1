@@ -26,6 +26,4 @@ interface PaymentRepository : JpaRepository<Payment, UUID> {
     fun existsByIdempotencyKey(key: String): Boolean
 
     fun findAllByUserId(userId: UUID, pageable: Pageable): Page<Payment>
-
-    fun findAllByRentalId(rentalId: UUID): List<Payment>
 }
