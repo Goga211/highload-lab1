@@ -34,6 +34,13 @@ docker compose up --build
 | `FUEL_LOW_THRESHOLD_PERCENT` | порог топлива для наряда на заправку | 15 |
 | `LIQUIBASE_CONTEXTS` | `default` только схема, `default,demo` со схемой и демо-данными | `default,demo` |
 
+### Из IntelliJ IDEA
+
+1. Открыть папку проекта, IDEA импортирует его как Gradle-проект. JDK 21 для сборки Gradle скачает сам,
+   если его нет на машине.
+2. Поднять только базу: `docker compose up -d postgres`.
+3. Запустить конфигурацию `CarsharingApplication` (лежит в `.run/`, переменные окружения уже заданы).
+
 ## Тесты
 
 ```bash

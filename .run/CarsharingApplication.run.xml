@@ -1,0 +1,15 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="CarsharingApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="carsharing.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="ru.itmo.carsharing.CarsharingApplicationKt" />
+    <envs>
+      <env name="DB_URL" value="jdbc:postgresql://localhost:5432/carsharing" />
+      <env name="DB_USER" value="carsharing" />
+      <env name="DB_PASSWORD" value="carsharing" />
+      <env name="LIQUIBASE_CONTEXTS" value="default,demo" />
+    </envs>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
